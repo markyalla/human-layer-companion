@@ -1,0 +1,17 @@
+{
+  "name": "human-layer-companion",
+  "version": "1.0.0",
+  "description": "One-QR live audience companion for The Human Layer (Gold Coast Games).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/acceptance.js",
+    "test:all": "for t in acceptance present show ten prizes privacy security recovery browser neighbour live-growth; do node test/$t.js || exit 1; done"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "qrcode": "1.5.4"
+  }
+}

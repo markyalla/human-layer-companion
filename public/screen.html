@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Human Layer: Big Screen</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+:root{--ink:#0B0B0B;--ivory:#FBF8F0;--card:#FFFFFF;--line:#D9D0B8;--muted:#5A564C;--red:#C8111F;--green:#17692B;--yellow:#F8B808;--grey:#E9E3D3}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:"DM Sans",system-ui,sans-serif;overflow:hidden}
+body.dark{background:var(--ink);color:var(--ivory)}
+body.light{background:var(--ivory);color:var(--ink)}
+#stage{height:100vh;padding:4vh 5vw;display:flex;flex-direction:column}
+.kicker{font-size:2.2vh;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--yellow)}
+.light .kicker{color:var(--red)}
+h1{font-size:9vh;line-height:1;margin:1vh 0;letter-spacing:-.01em}
+.sub{font-size:3.6vh;margin:0}
+.wait{display:flex;gap:5vw;align-items:center;flex:1}
+.qrbox{background:var(--yellow);padding:2.2vh;border-radius:2vh;flex:none}
+.qrbox img{display:block;height:58vh;width:58vh;background:#fff}
+.url{font:700 3.4vh ui-monospace,Menlo,monospace;margin-top:2vh;word-break:break-all}
+.count{font-size:16vh;font-weight:700;line-height:1;color:var(--yellow);font-variant-numeric:tabular-nums}
+.light .count{color:var(--red)}
+.job{font-size:3.6vh;border-left:1vh solid var(--red);padding-left:2vh;margin:2vh 0;max-width:80vw}
+.prog{height:5vh;background:var(--grey);border-radius:1vh;overflow:hidden;margin:3vh 0 1vh;max-width:70vw}
+.prog div{height:100%;background:var(--green);transition:width .4s}
+.rows{display:flex;flex-direction:column;gap:3.2vh;margin-top:5vh}
+.r{display:grid;grid-template-columns:16vw 1fr 15vw;gap:2vw;align-items:center;font-size:5vh;font-weight:500}
+.t{background:var(--grey);height:9vh;border-radius:1.4vh;overflow:hidden}.t div{height:100%;background:var(--red);transition:width .5s}
+.t.g div{background:var(--green)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:4vw}
+.two>div{background:var(--card);border:2px solid var(--line);border-radius:2vh;padding:3vh}
+.big{font-size:12vh;font-weight:700;line-height:1}
+.note{font-size:2.6vh;color:var(--muted);margin-top:4vh}
+.dot{position:fixed;right:1.2vw;bottom:1.2vh;width:1.6vh;height:1.6vh;border-radius:50%;background:var(--green)}
+.dot.off{background:var(--red)}
+.off-msg{position:fixed;left:0;right:0;top:0;background:var(--red);color:#fff;font-weight:700;font-size:2.6vh;text-align:center;padding:1vh}
+
+.tag{display:inline-block;font-size:2.2vh;font-weight:700;letter-spacing:.14em;text-transform:uppercase;border-radius:999px;padding:.6vh 1.6vh;background:var(--ink);color:var(--yellow);margin-right:1.4vh}
+.tag.live{background:var(--green);color:#fff}
+.tag.done{background:var(--red);color:#fff}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:3vw}
+.counter{text-align:right;flex:none}
+.counter .n{font-size:15vh;font-weight:700;line-height:.9;color:var(--red);font-variant-numeric:tabular-nums;display:inline-block}
+.counter .n.pop{animation:pop .5s ease-out}
+.counter .of{font-size:3vh;color:var(--muted)}
+@keyframes pop{0%{transform:scale(1)}30%{transform:scale(1.25)}100%{transform:scale(1)}}
+.r .t div{transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.r.grew .t div{filter:brightness(1.25)}
+.r.grew span:last-child{transform:scale(1.12);transform-origin:left}
+.r span:last-child{transition:transform .3s;font-variant-numeric:tabular-nums}
+.r .t.c0 div{background:var(--red)}.r .t.c1 div{background:var(--yellow)}.r .t.c2 div{background:var(--green)}.r .t.c3 div{background:var(--ink)}.r .t.c4 div{background:#8A8473}.r .t.c5 div{background:#B7452F}
+.sect{font-size:2.6vh;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--muted);margin-top:3vh}
+</style>
+</head>
+<body class="dark">
+<img src="/present/logo.png" alt="Gold Coast Games" style="position:fixed;left:2vw;bottom:2vh;height:10vh;width:10vh;background:#FBF8F0;border-radius:1.4vh;padding:.6vh;z-index:5"><div id="stage"></div><div class="dot off" id="dot" title="live connection"></div>
+<script>
+(function(){
+'use strict';
+var parts=location.pathname.split('/'); var code=(parts[2]||'').toUpperCase(); var key=new URLSearchParams(location.search).get('k')||'';
+var V=null, live=false, stage=document.getElementById('stage'), dot=document.getElementById('dot');
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+var jurl=location.origin+'/j/'+code;
+var prev={}, lastN=0;
+function patch(h){var tmp=document.createElement('div'); tmp.innerHTML=h; var nr=tmp.querySelectorAll('.r'), or=stage.querySelectorAll('.r'); if(nr.length!==or.length){stage.innerHTML=h;return}
+  nr.forEach(function(el,i){var o=or[i]; o.className=el.className; o.children[0].textContent=el.children[0].textContent; o.children[1].firstElementChild.style.width=el.children[1].firstElementChild.style.width; o.children[2].textContent=el.children[2].textContent;});
+  var cn=document.getElementById('cn'), ncn=tmp.querySelector('#cn'); if(cn&&ncn)cn.textContent=ncn.textContent; var of1=stage.querySelector('.counter .of'), of2=tmp.querySelector('.counter .of'); if(of1&&of2)of1.textContent=of2.textContent; var nt=tmp.querySelector('.note'), ot=stage.querySelector('.note'); if(nt&&ot)ot.textContent=nt.textContent;
+  setTimeout(function(){stage.querySelectorAll('.r.grew').forEach(function(e){e.classList.remove('grew')})},900);}
+function rows(items,cls,scale){scale=scale||100;return '<div class="rows">'+items.map(function(o,i){var grew=prev[o.id]!==undefined&&o.count>prev[o.id];return '<div class="r'+(grew?' grew':'')+'"><span>'+esc(o.name)+'</span><div class="t c'+(i%6)+'"><div style="width:'+(scale===100?o.pct:Math.min(100,o.count/scale*100))+'%"></div></div><span>'+o.count+' \u00b7 '+o.pct+'%</span></div>'}).join('')+'</div>'}
+function remember(r){ if(!r) return; (r.options||[]).concat(r.reasons||[]).forEach(function(o){prev[o.id]=o.count}); }
+function draw(){
+  var body=document.body, h='';
+  if(!V){ body.className='dark'; stage.innerHTML='<div class="kicker">The Human Layer</div><h1>Connecting…</h1>'; return; }
+  var ph=V.state.phase, cur=V.current, r=V.currentResults;
+  if(V.status==='ended'||ph==='ended'){ body.className='dark'; h='<div class="kicker">'+esc(V.name)+'</div><h1>Thank you.</h1><p class="sub">'+V.joined+' people took part.</p>'; }
+  else if(ph==='idle'||!cur){
+    body.className='dark';
+    h='<div class="kicker">'+esc(V.name)+'</div><h1>Scan once. Stay in.</h1><div class="wait"><div><div class="qrbox"><img alt="QR code to join" src="/qr.svg?u='+encodeURIComponent(jurl)+'"></div></div><div><div class="url">'+esc(jurl.replace(/^https?:\/\//,''))+'</div><div class="count">'+V.joined+'</div><p class="sub">joined'+(V.audience?' of about '+V.audience+' in the room \u00b7 '+Math.round(V.joined/V.audience*100)+'%':'')+'</p></div></div>';
+  } else {
+    body.className='light';
+    var tag=ph==='open'?'<span class="tag live">Open</span>':ph==='paused'?'<span class="tag">Paused</span>':ph==='closed'?'<span class="tag done">Closed</span>':'<span class="tag done">Final</span>';
+    var showLive=cur.showLive!==false;
+    var reveal=(ph==='revealed');
+    var pct=r.joined?Math.round(r.submitted/r.joined*100):0;
+    h='<div class="head"><div>'+tag+'<span class="kicker">'+esc(cur.title)+'</span><h1>'+esc(cur.prompt||'')+'</h1></div><div class="counter"><div class="n" id="cn">'+r.submitted+'</div><div class="of">answered \u00b7 '+r.joined+' joined</div></div></div>';
+    if(r.arms){
+      h+='<div class="two" style="margin-top:3vh">'+['plain','timed'].map(function(k){var a2=r.arms[k];return '<div><div class="kicker">'+(k==='plain'?'Cohort 1: plain':'Cohort 2: the game')+'</div><div class="big" data-k="'+k+'">'+a2.finished+'</div><p class="sub">finished of '+a2.assigned+(a2.pctOfAssigned==null?'':' \u00b7 '+a2.pctOfAssigned+'%')+(a2.droppedOut?' \u00b7 '+a2.droppedOut+' did not':'')+'</p>'+(reveal?'<p class="sub">Median time: '+(a2.medianSeconds==null?'\u2013':a2.medianSeconds+'s')+' \u00b7 Average: '+(a2.meanSeconds==null?'\u2013':a2.meanSeconds+'s')+' \u00b7 Fastest: '+(a2.fastestSeconds==null?'\u2013':a2.fastestSeconds+'s')+'</p>':'')+'</div>'}).join('')+'</div>';
+      if(reveal) h+='<p class="note">Small groups from a live room. A demonstration, not a study.</p>';
+    } else if(showLive||reveal){
+      var sc=Math.max(r.joined,r.submitted,1); h+=rows(r.options||[],'',sc);
+      if(r.reasons&&(reveal||showLive)) h+='<div class="sect">What mattered \u00b7 of '+r.reasonsDenominator+' who said</div>'+rows(r.reasons,'',sc);
+    } else {
+      h+='<div class="prog" style="margin-top:4vh"><div style="width:'+pct+'%"></div></div><p class="sub">Results appear when the presenter reveals them.</p>';
+    }
+  }
+  if(!live) h='<div class="off-msg">Live connection lost. Showing the last update. Reconnecting…</div>'+h;
+  var key=(V&&V.state?V.state.activityId+'|'+V.state.phase:'')+'|'+(live?1:0);
+  if(stage.dataset.key===key && stage.querySelector('.rows')){ patch(h); } else { stage.dataset.key=key; stage.innerHTML=h; lastN=V&&V.currentResults?V.currentResults.submitted:0; }
+  if(V&&V.currentResults){ var n=V.currentResults.submitted; if(n>lastN){var c=document.getElementById('cn'); if(c){c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');}} lastN=n; remember(V.currentResults); }
+  dot.className='dot'+(live?'':' off');
+}
+function connect(){
+  var es=new EventSource('/api/screen/'+code+'/stream?k='+encodeURIComponent(key));
+  es.addEventListener('host',function(e){V=JSON.parse(e.data);live=true;draw()});
+  es.onerror=function(){live=false;draw()};
+}
+draw(); connect();
+})();
+</script>
+</body>
+</html>

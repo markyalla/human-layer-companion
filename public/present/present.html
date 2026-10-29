@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Human Layer: Presenter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&display=swap">
+<style>
+:root{--ink:#0B0B0B;--iv:#FBF8F0;--card:#FFFFFF;--line:#D9D0B8;--mut:#5A564C;--red:#C8111F;--grn:#17692B;--yel:#F8B808;--grey:#E9E3D3}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden;font-family:'DM Sans',Arial,sans-serif}
+#view{position:fixed;left:0;right:0;top:0;bottom:44px;display:flex;align-items:center;justify-content:center}
+#stage{width:1920px;height:1080px;position:relative;transform-origin:center center;flex:none;overflow:hidden;background:var(--ink)}
+.sl{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:none}
+.sl.on{display:block}
+.sl>section{width:1920px!important;height:1080px!important;position:relative;overflow:hidden;box-sizing:border-box}
+.sl aside{display:none}
+.serif{font-family:'DM Serif Display',Georgia,serif}
+p,h1,h2,h3{margin:0}
+/* controls */
+#bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;align-items:center;padding:8px 14px;background:rgba(0,0,0,.82);color:#FBF8F0;font:600 15px 'DM Sans',sans-serif;z-index:20;transition:opacity .25s}
+#bar.hide{opacity:0;pointer-events:none}
+body.showmode #bar,body.showmode #notes,body.showmode #login{display:none!important}
+body.showmode{cursor:none}
+body.showmode #view{bottom:0}
+@media (pointer:coarse){#bar button{padding:14px 20px;font-size:18px}}
+#bar button{font:700 15px 'DM Sans',sans-serif;border:0;border-radius:6px;padding:6px 12px;cursor:pointer;background:#FBF8F0;color:#0B0B0B}
+#bar button.r{background:#C8111F;color:#fff}#bar button.g{background:#17692B;color:#fff}
+#bar .sp{flex:1}
+#phase{padding:3px 10px;border-radius:99px;background:#444}
+#phase.open{background:#17692B}#phase.revealed,#phase.closed{background:#C8111F}
+#dot{width:12px;height:12px;border-radius:50%;background:#C8111F}#dot.ok{background:#2fbf5b}
+#notes{position:fixed;right:12px;bottom:64px;width:600px;max-width:calc(100vw - 24px);max-height:58vh;overflow:auto;white-space:pre-line;background:#fff;color:#111;border-radius:10px;padding:16px 18px;font:19px/1.5 'DM Sans',sans-serif;z-index:30;display:none;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+#notes.on{display:block}
+#login{position:fixed;inset:0;background:#0B0B0B;color:#FBF8F0;display:none;align-items:center;justify-content:center;z-index:50;flex-direction:column;gap:14px;font:20px 'DM Sans',sans-serif}
+#login input{font:20px 'DM Sans';padding:10px 14px;border-radius:8px;border:0;width:300px}
+#login button{font:700 20px 'DM Sans';padding:10px 22px;border:0;border-radius:8px;background:#F8B808}
+/* live slide parts */
+.tag{display:inline-flex;font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:6px 20px;border-radius:99px}
+.num{font-variant-numeric:tabular-nums}
+.pop{animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(1)}30%{transform:scale(1.3)}100%{transform:scale(1)}}
+.pcard{background:#FFFBF0;color:#0B0B0B;display:flex;flex-direction:column;gap:10px;padding:18px 20px 0}
+.barzone{height:290px;display:flex;flex-direction:column;justify-content:flex-end;margin:0 -20px}
+.barzone .bn{font-size:60px;font-weight:700;line-height:1;padding:0 20px 8px;font-variant-numeric:tabular-nums}
+.barzone .bf{height:0;transition:height .7s cubic-bezier(.2,.8,.2,1)}
+.barzone .bn.grew{animation:pop .5s ease-out}
+.chip{background:rgba(0,0,0,.15);padding:8px 18px;border-radius:99px;font-size:26px;font-weight:700}
+/* demo */
+.dm{position:absolute;inset:0;padding:64px 96px 60px;background:#0B0B0B;color:#FBF8F0;display:flex;flex-direction:column;gap:26px}
+.dm h2{font-size:84px;font-weight:400;line-height:1}
+.pill{display:inline-flex;font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;padding:6px 20px;border-radius:99px}
+.btn{display:inline-flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;padding:12px 30px;border-radius:10px;border:3px solid #0B0B0B;cursor:pointer;background:#fff;color:#0B0B0B}
+.btn.pri{background:#17692B;color:#FBF8F0}.btn.yel{background:#F8B808}
+.sld{display:flex;align-items:center;height:26px}
+</style>
+</head>
+<body>
+<img id="brand" src="/present/logo.png" alt="Gold Coast Games" style="position:fixed;right:18px;bottom:62px;width:64px;height:64px;background:#FBF8F0;border-radius:10px;padding:4px;z-index:15;pointer-events:none">
+<div id="view"><div id="stage"></div></div>
+<div id="notes"></div>
+<div id="bar"><span id="dot"></span><button id="bPrev">&larr;</button><button id="bNext">&rarr;</button><span id="pos"></span><span id="phase">idle</span><span id="live"></span><span class="sp"></span><button id="bOpen" class="g">Open (O)</button><button id="bClose">Close (C)</button><button id="bRev" class="r">Reveal (R)</button><button id="bNotes">Notes (N)</button><button id="bFull">Full screen (F)</button><button id="bCount">Show count (I)</button><button id="bProj">Projector link</button><button id="bHide">Hide (H)</button></div>
+<div id="login"><div>Organiser password</div><input id="pw" type="password" autocomplete="current-password"><button id="go">Sign in</button><div id="lerr" style="color:#F8B808"></div></div>
+<script>
+(function(){
+'use strict';
+var RED='#C8111F',GRN='#17692B',YEL='#F8B808',INK='#0B0B0B',IV='#FBF8F0';
+var code=(location.pathname.split('/')[2]||'').toUpperCase();
+var SHOW=location.pathname.indexOf('/show/')===0, KEY=new URLSearchParams(location.search).get('k')||'';
+if(SHOW)document.body.classList.add('showmode');
+var stage=document.getElementById('stage'), V=null, idx=0, step=0, slides=[], live=false;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function $(i){return document.getElementById(i)}
+function el(h){var d=document.createElement('div');d.innerHTML=h;return d.firstElementChild}
+
+/* ---------- people, scenarios, matching (invented profiles; rule-based, not an AI model) ---------- */
+var DIMS=['team','long','people','detail','unknown','speed','free'];
+var PEOPLE={
+ ama:{id:'ama',plus:["Deepest technical skill in the building", "Spots mistakes others miss", "Others ask her to check their work"],minus:["Does her best work alone, on long projects", "Half her usual time free this month"],name:'Ama',role:'The Master',col:RED,v:{ontime:8,team:2,long:9,people:4,detail:9,unknown:3,speed:3,free:5}},
+ kofi:{id:'kofi',plus:["Explains anything simply", "People trust him quickly", "Brings sceptics along"],minus:["Energised by working with a team", "Prefers variety over fine detail"],name:'Kofi',role:'The Storyteller',col:YEL,v:{ontime:6,team:9,long:4,people:9,detail:3,unknown:5,speed:6,free:10}},
+ yaw:{id:'yaw',plus:["Has never missed a deadline", "Same quality, week after week", "Careful with detail"],minus:["Likes a clear plan and a long, steady run", "Calm alone or in a small team"],name:'Yaw',role:'The Metronome',col:GRN,v:{ontime:10,team:5,long:9,people:5,detail:9,unknown:2,speed:5,free:10}},
+ efua:{id:'efua',plus:["Fastest at completing work", "Thrives on short, urgent assignments", "Lifts the whole team"],minus:["Short, intense bursts; months-long work drains her", "Often works best alone, fast"],name:'Efua',role:'The Sprinter',col:INK,v:{ontime:7,team:3,long:1,people:6,detail:4,unknown:5,speed:10,free:8}},
+ selorm:{id:'selorm',plus:["Thrives when nothing is clear", "Finds a route through the unknown", "Asks for help early"],minus:["Explores best in a small team", "Restless in repetitive work"],name:'Selorm',role:'The Pathfinder',col:'#8A8473',v:{ontime:7,team:6,long:6,people:6,detail:4,unknown:10,speed:6,free:9}}};
+var ORDER=['ama','kofi','yaw','efua','selorm'];
+var SC=[
+ {n:1,act:'jobA',bg:YEL,fg:INK,title:'Month-end, 11:30 PM',text:'Payroll files are bouncing at your bank\'s payments API. 40,000 salaries must be resubmitted before the morning cut-off. You can release one person.',tags:['Before the cut-off','Hands-on','One person released'],
+  story:'It is month-end, 11:30 PM, and you run technology at a bank in Accra. Each of your five people is holding something critical: core banking, cards and ATMs, the mobile app, fraud monitoring and regulatory reporting. Partner companies\' payroll files are bouncing at your payments API. The CFO calls: 40,000 salaries must be resubmitted before the morning cut-off. The vendor on call says the fault is in your setup, and only your team can change production. The incident manager can release one person. Everyone else stays on watch. Someone has to find the fault and fix it, hands-on, tonight.',
+  facts:[['Time','Overnight, before the cut-off'],['Team','One person released. The rest stay on watch.'],['Pressure','40,000 salaries. Only your team can fix it.']],
+  t:{team:3,long:1,people:3,detail:6,unknown:3,speed:9,free:6},w:{team:7,long:4,people:3,detail:4,unknown:3,speed:9,free:6}},
+ {n:2,act:'jobB',bg:GRN,fg:IV,title:'Launch day for 300 agents',text:'A new bill-pay feature goes live in three weeks. 300 field agents to train, a support desk to staff, and a team of six who have never worked together.',tags:['3 weeks','Team of six','People and logistics'],
+  story:'A new bill-pay feature goes live across the country in three weeks. 300 mobile money agents in Greater Accra and Kumasi need to be trained, the support desk needs a script for the questions agents will ask, and the day-one plan has to be printed and tested. Six people from product, support and marketing have been lent to you. They have never worked together. Half the job is detail and logistics. The other half is people: keeping agents, the partner and the team calm.',
+  facts:[['Time','Three weeks'],['Team','Six people from product, support and marketing'],['Pressure','One launch day. No second try.']],
+  t:{team:7,long:5,people:8,detail:7,unknown:5,speed:5,free:7},w:{team:8,long:4,people:8,detail:8,unknown:4,speed:4,free:6}},
+ {n:3,act:'jobC',bg:RED,fg:IV,title:'Why do new customers go quiet?',text:'Four months, a team of five, weekly agent and customer calls in several languages, and a brief nobody agrees on.',tags:['4 months','Team of five','Unclear brief'],
+  story:'A mobile payments company registers many new wallet customers, but too many never make a second transaction. The MD says: fix it by March. But nobody agrees what fixed means. Sales wants more activations, compliance wants every ID check completed, and the agents on the street say customers simply do not trust it yet. Customers register in Twi, Ga, Ewe, Dagbani and English, through the app, USSD or an agent. A team of five, a call with agents or customers every week, and monthly numbers go to the board.',
+  facts:[['Time','Four months'],['Team','Five, from sales, compliance and field support'],['Pressure','A vague brief. Numbers the board will read.']],
+  t:{team:7,long:8,people:8,detail:7,unknown:8,speed:3,free:7},w:{team:7,long:7,people:8,detail:6,unknown:8,speed:3,free:6}}];
+var DL={team:'Team',long:'Long project',people:'People contact',detail:'Detail',unknown:'Unclear brief',speed:'Speed',free:'Time free'};
+function fit(dim,p,t){return dim==='free'?Math.min(1,p/t):1-Math.abs(p-t)/10}
+function phrase(dim,sc,p){var t=sc.t[dim];
+ if(dim==='team')return t>=7?(p>=7?'works best in a team, which this job needs':'is comfortable in a team, which this job needs'):t<=4?'does their best work alone, which this job needs':'is comfortable in a small team';
+ if(dim==='long')return t>=6?'is steady over a long run':t<=3?'thrives on short, intense stretches':'is fine with a medium-length project';
+ if(dim==='people')return 'is strong with customers and colleagues';
+ if(dim==='detail')return 'keeps the detail right';
+ if(dim==='unknown')return 'thrives when the brief is still unclear';
+ if(dim==='speed')return 'moves fast';
+ return 'has the time free ('+p+' of 10)';}
+function weak(dim,sc){var t=sc.t[dim];
+ if(dim==='team')return 'prefers working alone';if(dim==='long')return t>=6?'prefers shorter projects':'prefers long projects';
+ if(dim==='people')return 'is less people-facing';if(dim==='detail')return 'is looser on detail';if(dim==='unknown')return 'prefers a clear brief';if(dim==='speed')return 'works at a steadier pace';return 'has less time free';}
+function whyNot(dim,sc,p){var t=sc.t[dim];
+ if(dim==='team')return p<t?'prefers working alone, and this job needs a team':'prefers a team, and this job is mostly solo';
+ if(dim==='long')return p<t?'prefers shorter projects, and this one runs long':'prefers long projects, and this one is short';
+ if(dim==='people')return 'is less at home with people, and this job is full of them';
+ if(dim==='detail')return p<t?'is looser on detail, and this job needs it right':'is very detail-focused, and this job needs speed';
+ if(dim==='unknown')return p<t?'prefers a clear brief, and this one is unclear':'prefers fuzzy briefs, and this one is clear';
+ if(dim==='speed')return p<t?'works at a steadier pace, and this job is urgent':'works faster than this job needs';
+ return 'has less time free ('+p+' of 10)';}
+function match(sc){
+ var W=0;DIMS.forEach(function(d){W+=sc.w[d]});
+ return ORDER.map(function(id){var P=PEOPLE[id],s=0,parts=[];
+  DIMS.forEach(function(d){var f=fit(d,P.v[d],sc.t[d]);s+=sc.w[d]*f;parts.push({d:d,f:f,c:sc.w[d]*f,w:sc.w[d]})});
+  var good=parts.filter(function(x){return x.f>=0.8&&x.w>=5}).sort(function(a,b){return b.c-a.c}).slice(0,3);
+  var bad=parts.filter(function(x){return x.f<=0.6&&x.w>=5}).sort(function(a,b){return b.w*(1-b.f)-a.w*(1-a.f)})[0];
+  var gp=parts.slice().sort(function(a,b){return b.w*(1-b.f)-a.w*(1-a.f)})[0];return {id:id,why:whyNot(gp.d,sc,P.v[gp.d]),score:s/W,good:good.map(function(x){return phrase(x.d,sc,P.v[x.d])}),watch:bad?weak(bad.d,sc):null};
+ }).sort(function(a,b){return b.score-a.score});}
+function sliderRow(l,r,pos,col,fg){return '<div style="display:flex;flex-direction:column;gap:2px"><div style="display:flex;justify-content:space-between;font-size:24px;font-weight:700"><span>'+l+'</span><span>'+r+'</span></div><div class="sld"><div style="flex:0 0 '+pos+'%;height:8px;background:'+col+'"></div><div style="width:26px;height:26px;border-radius:50%;background:'+col+';border:4px solid '+INK+'"></div><div style="flex:1;height:8px;background:#D9D0B8"></div></div></div>'}
+
+/* ---------- slide definitions ---------- */
+var DEF=[
+ {id:'about',live:'about',steps:2,note:'OPENING. 1) GROUND: We are Gold Coast Games. We have done this work before, and this is how it looks. 2) PRESS THE RIGHT ARROW: the reel plays (about 25 seconds). Say: this is a game to educate people about the climate crisis in Ghana, made for Kantamanto Upcyclers and the OR Foundation. It is an education game about sustainable living, and we made it fun. Look at their reaction. Let it run. 3) AFTER THE REEL, the range: We have done the same at events for AU ECOSOCC, and we have reached all the way to a realistic ITSM simulation. For those who do not know, ITSM is IT service management: how IT teams handle incidents, requests and changes. That one is in development. We also host our own flagship game nights, in a space in Dzorwulu, where we experiment with our products and test the market. 4) THE POINT: Through research, we can create games at multiple layers, and hopefully you learn more as we go along. 5) THE STEP UP: This deck shows a much more ambitious project: a fun, engaging system to help manage my games company, which might interest everybody in this room. It is in beta: we are testing it on our own crew first. I thought it would be interesting for this room, because at Agile in Africa, creating systems that work for our culture matters. (If time: it came from organising our own startup and making sure our people feel content and seen.) 6) PRESS THE RIGHT ARROW AGAIN: next slide. CAREFUL: say beta, not launched. The app is in beta and tested on your own crew. Say each client name only if you have permission, and check the exact spellings: Kantamanto Upcyclers, OR Foundation, AU ECOSOCC. Say climate crisis or waste crisis, whichever the game is really about. ITSM is IT service management, not systems management. Say in development for the simulation. Check the game nights are as described and ongoing before you say we host them. Check the people in the reel agreed to it being shown. Say might interest, not will. If the video does not appear, the frame says so: tell the same story without it.'},{id:'cover',img:'cover'},{id:'people',img:'people'},{id:'turnover',img:'turnover'},{id:'number',img:'number'},
+ {id:'join',live:'join',act:'onboard',note:'LIVE: JOIN. The QR is real. The onboarding form opens on phones as soon as this slide appears. Say: "Scan once and stay on one page for everything today. If you want to take part throughout, keep that page open." Do not say which half sees the countdown. • HELP A NEIGHBOUR ANSWER: point it out. At the bottom of the phone page there is a button, Help a neighbour answer. If someone next to you is stuck, or not used to smartphones, they can answer on YOUR phone, as their own person, and then you go back to your own answers. • WHY WE BUILT IT: to show that we can design tech platforms that take the current climate into account: not everybody is tech savvy or tech native, and we have to design for inclusion. Say it as a design choice, not a favour. • CAREFUL: it is the last thing on the phone page, so say where it is. Each neighbour gets their own name and their own answers. Fallback if wifi fails: show of hands. Press the right arrow at about 90 seconds: the next slide closes it and shows the result.'},
+ {id:'arms',live:'arms',act:'onboard',post:['close','reveal'],note:'LIVE: RESULT OF THE ONBOARDING TEST. Press R to reveal the golden apple winner (fastest finisher across both cohorts). Read the real numbers whichever way they point. One room, a hint, not proof. • THE POINT, SAY IT SIMPLY: You may be wondering how the platform itself works with gamification. This is a small taste of it. Gamification is a process that helps: the aim is better systems that reward people, and we use it to make things fun. Life does not have to be so boring, and neither do systems. Who told us they have to be? Why not make it fun, if it does not take anything away? We spend most of our lives in them. • CAREFUL: call it a taste and a hint, not proof: one room, one test. If someone says fun distracts from serious work: the aim is to make the right behaviour easier and recognised, not to turn work into a score. People still decide. A group under 10 is "too few to compare".'},
+ {id:'vote',img:'vote',act:'__idle'},
+ {id:'pick',live:'pick',n:0,act:'jobA',note:'LIVE: THE VOTE. Thirty seconds. They vote on their phones as the team leader. The bars grow as votes arrive. Say: the first person to pull the right person wins a golden apple. If it feels hard on your own, turn to the people next to you, talk it through and decide together. Everyone still votes on their own phone. Press R to reveal: the winner name appears on the big screen. The ideal answer is Efua (fast, hands-on, alone, hard cut-off): the full reasons are on the next slide notes. Whoever they picked is defensible. Press the right arrow to close the vote and see the final numbers.'},
+ {id:'pickr',live:'result',n:0,post:['close','reveal'],note:'LIVE: THE VOTE RESULT. Read the tallest out. The room decided, not the system. • THE IDEAL PICK: EFUA. Tonight is a sprint: hands-on, alone, against a hard cut-off. Efua is the fastest on the team (speed 10) and thrives on short, urgent jobs. • SAY THE COST: Efua accuracy is lower (4 out of 10), so name a reviewer. Ama or Yaw checks the fix before it goes live. • WHY NOT THE OTHERS: Ama is the most accurate (9), so she signs it off, but speed 3 is too slow for a fixed cut-off. Kofi wins the room, but this job is not about people. Yaw is the long, steady job, not a night sprint. Selorm shines when nothing is clear, but here the fault is known. • WHY SOME GOT IT WRONG: it is natural to pick the most trusted (track record) or the most careful when the stakes feel high. The job decides who fits best, not who is best overall. Say: not wrong, a different fit. • NEXT: now change the job, and meet the system that helps.'},
+ {id:'shortlist',img:'shortlist'},{id:'demovid',live:'video',video:'demo.mp4',note:'THIS ISN\u2019T JUST A CONCEPT, about 90s with the film (75s). This slide holds the demo video: it plays on the projector with sound, this screen shows a card only. • BEFORE: This is GCG Game Plan. It is in beta, and we are testing it in our own company first. The people in the video are made up. • DURING: say nothing. Let it run, about 75 seconds. • AFTER, one line each: the manager adds the job, the system suggests with reasons, the manager decides, the person says yes or asks first. The system suggests, humans decide. • BE HONEST: matching is rule-based today and AI is next. It is a beta: we are still learning what breaks. • INVITE: what I would love to learn from this room is where this would break in your organisation. • FALLBACK if the video will not play: describe the loop in one sentence and go to the next slide.'},{id:'notjust',img:'notjust'},{id:'demo',img:'demo',link:{href:'https://claude.ai/artifact/P44iPoxS3QN5m5mc7zefuF',x:128,y:304,w:435,h:74}},
+ {id:'changed',img:'changed'},{id:'three',img:'three'},{id:'glue',img:'glue'},{id:'values',img:'values'},{id:'choice',img:'choice'},{id:'whatchanged',img:'whatchanged'},
+ {id:'ask',img:'ask',act:'interest',over:'interest'},
+ {id:'final',img:'final',act:'rate'}];
+
+
+/* ---------- golden apples: shown only after the host reveals ---------- */
+var prizeEl=document.createElement('div');prizeEl.id='prize';prizeEl.style.cssText='position:fixed;left:0;right:0;top:0;background:#0B0B0B;color:#F8B808;padding:0.4vh 2vw;font-weight:800;font-size:2.6vh;line-height:1.25;text-align:center;z-index:30;display:none';document.body.appendChild(prizeEl);
+var clEl=document.createElement('div');clEl.id='cl';clEl.style.cssText='position:fixed;left:12px;bottom:56px;max-width:46vw;background:#fff;color:#111;border-radius:8px;padding:8px 12px;font:600 15px DM Sans,sans-serif;z-index:25;display:none;box-shadow:0 4px 20px rgba(0,0,0,.4)';document.body.appendChild(clEl);
+function prizeUpd(){var d=DEF[idx],r=V&&V.currentResults,t='';
+ if(!SHOW){var cl=r&&r.correctList&&['pick','pickr'].indexOf(d&&d.id)>-1?r.correctList:null;if(cl&&cl.length){var c='Only you see this. Got it right, in order ('+cl.length+'): '+cl.slice(0,12).map(esc2).join(', ')+(cl.length>12?' ...':'');if(clEl.textContent!==c)clEl.textContent=c;clEl.style.display='block'}else clEl.style.display='none'}
+ if(d&&['arms','pick','pickr'].indexOf(d.id)>-1&&V.state&&V.state.phase==='revealed'&&r){
+  if(r.firstCorrect&&r.firstCorrect.label)t='GOLDEN APPLE &middot; first to get it right: '+esc2(r.firstCorrect.label);
+  else if(r.firstTimedFinisher&&r.firstTimedFinisher.label)t='GOLDEN APPLE &middot; fastest to join: '+esc2(r.firstTimedFinisher.label)+' ('+r.firstTimedFinisher.seconds+'s)';}
+ if(t){if(prizeEl.innerHTML!==t)prizeEl.innerHTML=t;prizeEl.style.display='block'}else prizeEl.style.display='none'}
+function esc2(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+setInterval(prizeUpd,400);
+/* 10-minute slot: the default run. Add ?len=full to both the tablet and the projector link for the whole deck. */
+var TEN=['about','cover','people','turnover','number','join','arms','vote','pick','pickr','demovid','changed','ask','final'];
+if(new URLSearchParams(location.search).get('len')!=='full')DEF=DEF.filter(function(d){return TEN.indexOf(d.id)>-1});
+var BUILD={};
+function vcard(t,s){return '<section style="width:1920px;height:1080px;background:#0B0B0B;color:#FBF8F0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px"><p style="font-size:96px;font-weight:800">'+t+'</p><p style="font-size:44px;color:#F8B808">'+s+'</p></section>'}
+BUILD.video=function(d){
+ var lab=d.label||'Demo video',url='/present/deck/'+d.video;
+ function frame(inner){return '<section style="width:1920px;height:1080px;background:#2A5A30;color:#FBF8F0;position:relative"><h1 class="serif" style="position:absolute;left:112px;top:44px;font-size:76px;font-weight:400;line-height:1.05">This isn&rsquo;t just a concept.</h1><p style="position:absolute;right:112px;top:70px;font-size:36px;font-weight:700;color:#F7B90A">In beta. Testing in my own company.</p><div id="vbox" style="position:absolute;left:210px;top:160px;width:1500px;height:844px;background:#0B0B0B;border-radius:24px;overflow:hidden">'+inner+'</div></section>'}
+ var inner=SHOW?'<video id="vid_'+d.id+'" src="'+url+'" playsinline preload="auto" style="display:block;width:100%;height:100%;object-fit:contain;background:#000"></video>':'<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center"><p style="font-size:64px;font-weight:800">'+lab+'</p><p style="font-size:36px;color:#F8B808">Playing on the projector</p></div>';
+ d.el.innerHTML=frame(inner);
+ if(SHOW)fetch(url,{headers:{Range:'bytes=0-0'}}).then(function(r){if(!r.ok)$('vbox').innerHTML='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:700;color:#F8B808">Video not added yet</div>'}).catch(function(){});
+ d.render=function(){var v=d.el.querySelector('video');if(v){v.currentTime=0;var p=v.play();if(p&&p.catch)p.catch(function(){})}};};
+BUILD.about=function(d){
+ var url='/present/deck/reaction.mp4',lab='Reel plays here';
+ var frame=SHOW?'<video src="'+url+'#t=0.1" playsinline preload="auto" style="display:block;width:100%;height:100%;object-fit:contain;background:#000"></video>':'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:40px;font-size:40px;font-weight:700;color:'+YEL+'">'+lab+'<br>on the projector</div>';
+ d.el.innerHTML='<section style="width:1920px;height:1080px;background:'+IV+';color:'+INK+';position:relative"><div style="position:absolute;left:112px;top:0;bottom:0;width:1090px;display:flex;flex-direction:column;justify-content:center;gap:40px"><p style="font-size:36px;font-weight:900;letter-spacing:6px;color:'+YEL+'">GOLD COAST GAMES &middot; ACCRA</p><h1 class="serif" style="font-size:108px;font-weight:700;line-height:1.04;color:'+RED+'">Culture, education<br>and systems,<br>made fun.</h1><p style="font-size:44px;font-weight:700;color:'+GRN+'">See how people react.</p></div><div id="reelbox" style="position:absolute;left:1268px;top:60px;width:540px;height:960px;background:#000;border:8px solid '+INK+';border-radius:40px;overflow:hidden">'+frame+'</div></section>';
+ if(SHOW)fetch(url,{headers:{Range:'bytes=0-0'}}).then(function(r){if(!r.ok)$('reelbox').innerHTML='<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:40px;font-size:40px;font-weight:700;color:'+YEL+'">Video not added yet</div>'}).catch(function(){});
+ d.render=function(){var v=d.el.querySelector('video');if(!v)return;if(step===1){v.currentTime=0;var pr=v.play();if(pr&&pr.catch)pr.catch(function(){})}else{v.pause();try{v.currentTime=0.1}catch(e){}}};};
+
+/* ---------- loading ---------- */
+function loadStatic(d){return fetch('/present/slides/'+d.file+'.html').then(function(r){return r.text()}).then(function(h){
+  var tmp=document.createElement('div');tmp.innerHTML=h;var a=tmp.querySelector('aside');d.note=d.note||(a?a.textContent:'');
+  var sec=tmp.querySelector('section'); var w=el('<div class="sl"></div>'); w.appendChild(sec); return w;})}
+var DECKNOTES={};
+function buildImg(d){
+  var link=d.link?'<a href="'+d.link.href+'" target="_blank" rel="noopener" title="Open GCG Game Plan" style="position:absolute;left:'+d.link.x+'px;top:'+d.link.y+'px;width:'+d.link.w+'px;height:'+d.link.h+'px;border-radius:999px"></a>':'';
+  d.el.innerHTML='<section style="position:relative;width:1920px;height:1080px;background:#0B0B0B"><img alt="" src="/present/deck/'+d.img+'.jpg" style="display:block;width:1920px;height:1080px">'+link+'</section>';
+}
+function buildAll(){
+  return fetch('/present/deck/notes.json').then(function(r){return r.json()}).catch(function(){return {}}).then(function(N){
+    DECKNOTES=N;
+    DEF.forEach(function(d){
+      d.el=el('<div class="sl"></div>');
+      if(d.img){ buildImg(d); if(!d.note&&DECKNOTES[d.img])d.note=DECKNOTES[d.img]; if(d.over)addOverlay(d); }
+      else if(d.file){ }
+      else BUILD[d.live](d);
+    });
+    DEF.forEach(function(d){stage.appendChild(d.el)});show(0,0);
+  });
+}
+
+
+/* ---------- chart helpers: rings, bars and poles that load up ---------- */
+function ringH(id,col,track,size,stroke,numCol){var r=(size-stroke)/2,c=2*Math.PI*r;
+ return '<div style="position:relative;width:'+size+'px;height:'+size+'px;flex:none"><svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" style="transform:rotate(-90deg)"><circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+track+'" stroke-width="'+stroke+'"/><circle id="'+id+'_c" data-c="'+c+'" cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+col+'" stroke-width="'+stroke+'" stroke-dasharray="'+c+'" stroke-dashoffset="'+c+'" style="transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)"/></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:'+numCol+'"><p id="'+id+'_p" class="num" style="font-size:'+Math.round(size*.21)+'px;font-weight:700;line-height:1">0%</p></div></div>'}
+function ringSet(id,frac,label){var c=$(id+'_c');if(!c)return;var L=parseFloat(c.getAttribute('data-c'));c.style.strokeDashoffset=String(L*(1-Math.max(0,Math.min(1,frac))));bump($(id+'_p'),label)}
+function hbarH(id,label,col,track,fg,h){return '<div style="display:flex;align-items:center;gap:20px"><p style="font-size:30px;font-weight:700;width:190px;flex:none;color:'+fg+'">'+label+'</p><div style="flex:1;height:'+h+'px;background:'+track+'"><div id="'+id+'_b" style="height:'+h+'px;width:0;background:'+col+';transition:width 1s cubic-bezier(.2,.8,.2,1)"></div></div><p id="'+id+'_v" class="num" style="font-size:'+Math.round(h*.8)+'px;font-weight:700;line-height:1;width:170px;flex:none;text-align:right;color:'+fg+'">&ndash;</p></div>'}
+function hbarSet(id,frac,text){var b=$(id+'_b');if(b)b.style.width=Math.round(Math.max(0,Math.min(1,frac))*100)+'%';var v=$(id+'_v');if(v&&v.textContent!==text){v.textContent=text;v.classList.remove('pop');void v.offsetWidth;v.classList.add('pop')}}
+function poleH(id,col,track,fg,h){return '<div style="display:flex;align-items:flex-end;gap:14px;height:'+h+'px"><div style="width:64px;height:'+h+'px;background:'+track+';display:flex;align-items:flex-end;flex:none"><div id="b'+id+'" style="width:64px;height:0;background:'+col+';transition:height .8s cubic-bezier(.2,.8,.2,1)"></div></div><div style="display:flex;flex-direction:column;justify-content:flex-end;min-width:0;color:'+fg+'"><p class="bn" id="n'+id+'" style="font-size:84px;font-weight:700;line-height:.9">0</p><p id="q'+id+'" style="font-size:26px;font-weight:700;margin-top:4px">votes</p></div></div>'}
+function poleSet(id,frac,count,pct,lead){var b=$('b'+id),n=$('n'+id),q=$('q'+id);if(!b)return;b.style.height=Math.round(Math.max(0,Math.min(1,frac))*100)+'%';var t=String(count);if(n.textContent!==t){n.textContent=t;n.classList.remove('grew');void n.offsetWidth;n.classList.add('grew')}q.textContent=count?pct+'% of votes':'votes';n.style.color=lead?'#C8101E':''}
+
+/* ---------- live slide builders ---------- */
+
+BUILD.join=function(d){
+  var url=location.origin+'/j/'+code;
+    d.el.innerHTML='<section style="background:'+INK+';color:'+IV+';padding:80px 128px;display:grid;grid-template-columns:minmax(0,1fr) 640px;gap:80px;align-items:center;width:1920px;height:1080px;position:relative">'+
+  '<div style="display:flex;flex-direction:column;gap:26px"><div style="display:flex;gap:20px;align-items:center"><span class="tag" style="background:'+YEL+';color:'+INK+'">&#9679; Live</span><p style="font-size:30px;font-weight:700;color:#CFC8B4">About one minute</p></div>'+
+  '<div><p style="font-size:180px;font-weight:700;line-height:.95">Scan</p><p style="font-size:180px;font-weight:700;line-height:.95;color:'+YEL+'">to join.</p></div>'+
+  '<p style="font-size:42px;font-weight:700">Half of you will see a countdown.</p><p style="font-size:30px;color:#CFC8B4;width:900px;line-height:1.3">Shown as totals. Stuck? Ask a neighbour to tap <b>Help a neighbour join</b> and scan their phone.</p>'+
+  '<div style="width:900px;margin-top:8px;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:baseline;gap:22px"><p id="jn" class="num" style="font-size:130px;font-weight:700;color:'+YEL+';line-height:1">0</p><p id="jroom" style="font-size:32px;font-weight:700;line-height:1.15">joined</p></div>'+hbarH('jfn','Finished','#4FB36B','#2B2B2B',IV,44)+'<p id="jh" style="font-size:34px;font-weight:700;color:'+YEL+';min-height:42px"></p></div></div>'+
+  '<div style="background:'+YEL+';padding:40px;display:flex;flex-direction:column;align-items:center;gap:24px"><img alt="QR code to join" src="/qr.svg?u='+encodeURIComponent(url)+'" style="width:560px;height:560px;background:#fff"><p style="font-size:38px;font-weight:700;color:'+INK+';text-align:center;word-break:break-all">'+esc(url.replace(/^https?:\/\//,''))+'</p></div></section>';
+  d.upd=function(){var n=V.joined,f=0,r=(V.allResults||[]).filter(function(x){return x.id==='onboard'})[0];if(r&&r.arms)f=r.arms.plain.finished+r.arms.timed.finished;bump($('jn'),n);$('jroom').textContent='joined'+(V.audience?' of about '+V.audience+' in the room \u00b7 '+Math.round(n/V.audience*100)+'%':'');hbarSet('jfn',n?f/n:0,f+' of '+n);var hh=V.helped||0;$('jh').textContent=hh?(hh+(hh===1?' person joined':' people joined')+' with a neighbour\u2019s help'):''};
+};
+BUILD.arms=function(d){
+  function panel(k,title,bg,fg,ring,track,bar){return '<div style="flex:1;background:'+bg+';color:'+fg+';padding:48px 56px;display:flex;flex-direction:column;align-items:center;gap:26px"><h3 style="font-size:64px;font-weight:700;line-height:1">'+title+'</h3>'+'<p id="a_'+k+'_n" class="num" style="font-size:220px;font-weight:700;line-height:1">0</p><div style="width:100%">'+hbarH('a_'+k+'_cnt','Finished',bar,track,fg,44)+'</div><div id="a_'+k+'_t" style="width:100%;opacity:0;transition:opacity .6s">'+hbarH('a_'+k+'_med','Median time',bar,track,fg,44)+'</div></div>'}
+  d.el.innerHTML='<section style="background:'+GRN+';color:'+IV+';padding:48px 112px 150px;width:1920px;height:1080px;position:relative;display:flex;flex-direction:column;gap:20px"><div><p style="font-size:28px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:'+YEL+'">Live result</p><h2 class="serif" style="font-size:104px;font-weight:400;line-height:1">Who finished?</h2></div><div style="display:flex;gap:0px;flex:1">'+panel('plain','Cohort 1: plain',IV,INK,GRN,'#E3DCC9','#176B2D')+panel('timed','Cohort 2: the game',INK,IV,YEL,'#2B2B2B',YEL)+'</div><p id="a_diff" style="font-size:36px;font-weight:700;color:'+YEL+';min-height:44px"></p><p style="position:absolute;left:112px;bottom:40px;font-size:26px;color:#C7E6CD">One room, one test. A hint, not proof.</p></section>';
+  d.upd=function(){var r=(V.allResults||[]).filter(function(x){return x.id==='onboard'})[0];if(!r||!r.arms)return;var rv=V.state.phase==='revealed';
+   var mx=1,mf=1;['plain','timed'].forEach(function(k){var v=r.arms[k].medianSeconds;if(v!=null&&v>mx)mx=v;if(r.arms[k].finished>mf)mf=r.arms[k].finished});
+   ['plain','timed'].forEach(function(k){var a=r.arms[k];
+    bump($('a_'+k+'_n'),a.finished);
+    hbarSet('a_'+k+'_cnt',a.finished/mf,String(a.finished));
+    $('a_'+k+'_t').style.opacity=rv?1:0;
+    hbarSet('a_'+k+'_med',rv&&a.medianSeconds!=null?a.medianSeconds/mx:0,rv&&a.medianSeconds!=null?(Math.round(a.medianSeconds*10)/10)+'s':'–')});
+   var df=$('a_diff');if(df){var p=r.arms.plain,t=r.arms.timed;if(!rv){df.textContent='';}else if(p.finished+t.finished<10){df.textContent='Too few finished to compare.';}else{var dm=t.medianSeconds-p.medianSeconds;df.textContent='Finished: '+t.finished+' in the game, '+p.finished+' plain. Median time: '+(dm===0?'the same':(Math.abs(Math.round(dm*10)/10)+'s '+(dm<0?'faster':'slower')+' in the game'))+'.'}}};
+};
+/* Result slide: one idea, five poles. Nothing else. */
+BUILD.result=function(d){BUILD.pick(d)};
+function factsH(S){return S.facts.map(function(f,k){return '<div style="background:'+(k===1?INK:S.bg)+';color:'+(k===1?IV:S.fg)+';padding:16px 24px"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:.85">'+f[0]+'</p><p style="font-size:34px;font-weight:700;line-height:1.1">'+f[1]+'</p></div>'}).join('')}
+function tagH(S,n){return '<span class="tag" style="background:'+INK+';color:'+(S.bg===YEL?YEL:IV)+'">Scenario '+S.n+' of 3</span><p id="st'+n+'" style="font-size:28px;font-weight:700"></p>'}
+function verdictText(S,r){var m=match(S),g=m[0].score-m[1].score,sp=m[0].score-m[2].score,nm=function(x){return PEOPLE[x.id].name},pc=function(x){return Math.round(x.score*100)+'%'};var inTop=0,tot=0;(r.options||[]).forEach(function(o){tot+=o.count;if(o.id===m[0].id||o.id===m[1].id)inTop+=o.count});
+  var room=tot?' The room: '+inTop+' of '+tot+' picked one of the system’s top two.':'';
+  return S.n===1?('Clear call. The system picks '+nm(m[0])+' ('+pc(m[0])+'), '+Math.round(g*100)+' points ahead of '+nm(m[1])+'. Short, solo, urgent.'+room):('Close call. '+nm(m[0])+' '+pc(m[0])+', '+nm(m[1])+' '+pc(m[1])+', '+nm(m[2])+' '+pc(m[2])+': three within '+Math.round(sp*100)+' points. Here intuition decides, and the picker’s track record is worth tracking.'+room)}
+
+function statRows(P,small){var col=P.col;var rows=[['Speed',P.v.speed],['Accuracy',P.v.detail],['On time',P.v.ontime],['Free time',P.v.free]];
+ return rows.map(function(r){return '<div style="display:flex;align-items:center;gap:10px"><p style="font-size:24px;width:'+(small?112:124)+'px;flex:none">'+r[0]+'</p><div style="flex:1;height:18px;background:#E3DCC9"><div style="width:'+r[1]*10+'%;height:18px;background:'+col+'"></div></div><p style="font-size:24px;font-weight:700;width:30px;text-align:right;flex:none">'+r[1]+'</p></div>'}).join('')}
+function styleRows(P){var col=P.col;var rows=[['Solo','Team',P.v.team],['Sprint','Marathon',P.v.long],['Clear brief','Open brief',P.v.unknown],['Quiet','People',P.v.people]];
+ return rows.map(function(r){return '<div><div style="display:flex;justify-content:space-between;font-size:24px;color:#5A564C;line-height:1.1"><span>'+r[0]+'</span><span>'+r[1]+'</span></div><div style="position:relative;height:20px"><div style="position:absolute;left:0;right:0;top:8px;height:4px;background:#CFC8B4"></div><div style="position:absolute;left:'+((r[2]-0.5)*10)+'%;top:0;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:'+col+';border:3px solid '+INK+'"></div></div></div>'}).join('')}
+function secLabel(t){return '<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C;margin-top:6px">'+t+'</p>'}
+/* Scenario story slide: the story only. Votes open on the next slide. */
+BUILD.story=function(d){
+  var S=SC[d.n];
+  d.el.innerHTML='<section style="background:'+S.bg+';color:'+S.fg+';width:1920px;height:1080px;position:relative;padding:36px 80px 28px;display:flex;flex-direction:column;gap:18px">'+
+  '<div style="display:flex;gap:16px;align-items:center"><span class="tag" style="background:'+INK+';color:'+(S.bg===YEL?YEL:IV)+'">Scenario '+S.n+' of 3</span><p style="font-size:28px;font-weight:700">Read the story. The next slide has the five people'+(S.n===3?'':' and opens the vote')+'.</p></div>'+
+  '<div style="background:'+IV+';color:'+INK+';flex:1;display:flex;gap:48px;padding:40px 52px;min-height:0"><div style="flex:1.9;display:flex;flex-direction:column;gap:22px"><h2 style="font-size:84px;font-weight:700;line-height:1.05">'+S.title+'</h2><p style="font-size:46px;line-height:1.3">'+S.story+'</p></div><div style="flex:1;display:flex;flex-direction:column;gap:16px;justify-content:center">'+factsH(S)+'</div></div></section>';
+};
+/* Pick slide: the poll only. Who voted for whom, and why. The numbers about each person live on the phones. */
+var REASONS=[['track','Track record'],['pace','Fits the pace'],['people','Good with people'],['unknown','Handles the unknown'],['time','Has the time'],['gut','Gut feeling']];
+var QUESTION=['Who do you pull?','Who leads launch day?','Who leads this?'];
+BUILD.pick=function(d){
+  var S=SC[d.n],n=(d.live==='result'?'r':'')+d.n,rowsH='',whyH='';
+  ORDER.forEach(function(id){var P=PEOPLE[id];
+   rowsH+='<div style="display:flex;align-items:center;gap:26px"><div style="display:flex;align-items:center;gap:16px;width:420px;flex:none"><div style="width:34px;height:34px;border-radius:50%;background:'+P.col+';flex:none"></div><div><p style="font-size:60px;font-weight:700;line-height:1">'+P.name+'</p><p style="font-size:26px;color:#5A564C;margin-top:2px">'+P.role+'</p></div></div><div style="flex:1;height:58px;background:#E9E3D3;border-radius:8px;overflow:hidden"><div id="b'+n+'_'+id+'" style="height:58px;width:0;background:'+(P.col===INK?INK:P.col)+';transition:width .6s"></div></div><p class="bn" id="n'+n+'_'+id+'" style="font-size:64px;font-weight:700;width:90px;text-align:right;flex:none">0</p></div>'});
+  REASONS.forEach(function(r){
+   whyH+='<div style="display:flex;align-items:center;gap:16px"><p style="font-size:30px;width:250px;flex:none">'+r[1]+'</p><div style="flex:1;height:26px;background:#E9E3D3;border-radius:6px;overflow:hidden"><div id="rb'+n+'_'+r[0]+'" style="height:26px;width:0;background:'+INK+';transition:width .6s"></div></div><p id="rn'+n+'_'+r[0]+'" style="font-size:32px;font-weight:700;width:48px;text-align:right;flex:none">0</p></div>'});
+  d.el.innerHTML='<section style="background:'+IV+';color:'+INK+';width:1920px;height:1080px;position:relative;padding:44px 90px 36px;display:flex;flex-direction:column;gap:26px">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:16px;align-items:center">'+tagH(S,n)+'</div><div style="display:flex;gap:14px;align-items:baseline"><p id="cn'+n+'" class="num" style="font-size:72px;font-weight:700;line-height:1">0</p><p id="co'+n+'" style="font-size:30px;font-weight:700">answered</p></div></div>'+
+  '<h2 class="serif" style="font-size:120px;font-weight:400;line-height:1;color:'+RED+'">'+QUESTION[d.n]+'</h2>'+
+  '<div style="display:flex;gap:70px;flex:1;min-height:0"><div style="flex:1.55;display:flex;flex-direction:column;justify-content:space-between">'+rowsH+'</div>'+
+  '<div style="flex:1;display:flex;flex-direction:column;gap:18px;border-left:3px solid #D9D0B8;padding-left:50px;justify-content:center"><p style="font-size:30px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#5A564C">Why</p>'+whyH+'</div></div>'+
+  '<p id="vd'+n+'" style="font-size:34px;font-weight:700;line-height:1.25;min-height:44px"></p></section>';
+  d.upd=function(){var r=V.currentResults;if(!r||r.id!==S.act)return;var max=Math.max(r.joined,r.submitted,1);
+   bump($('cn'+n),r.submitted);$('co'+n).textContent='of '+r.joined+' answered';$('st'+n).textContent=(V.state.phase==='open'?'Open: vote on your phone':V.state.phase==='revealed'?'Final':'Closed')+((V.current&&V.current.role)?' \u00b7 you are '+V.current.role:'');
+   (r.options||[]).forEach(function(o){var bb=$('b'+n+'_'+o.id),nn=$('n'+n+'_'+o.id);if(!bb)return;bb.style.width=Math.round(o.count/max*100)+'%';var t=String(o.count);if(nn.textContent!==t){nn.textContent=t;nn.classList.remove('grew');void nn.offsetWidth;nn.classList.add('grew')}});
+   var rmax=Math.max.apply(null,[1].concat((r.reasons||[]).map(function(x){return x.count})));
+   (r.reasons||[]).forEach(function(x){var rb=$('rb'+n+'_'+x.id),rn=$('rn'+n+'_'+x.id);if(!rb)return;rb.style.width=Math.round(x.count/rmax*100)+'%';rn.textContent=x.count});
+   var topv=null,tie=false;(r.options||[]).forEach(function(o){if(o.count>0){if(!topv||o.count>topv.count){topv=o;tie=false}else if(o.count===topv.count)tie=true}});
+   $('vd'+n).textContent=V.state.phase==='revealed'&&topv?(tie?'The room is split.':'The room picked '+(PEOPLE[topv.id]?PEOPLE[topv.id].name:topv.name)+'.'):''};
+};
+/* Scenario 3: timed vote. The room's data goes into the system next. */
+BUILD.scen3=function(d){
+  var S=SC[d.n],n=d.n,tiles='';
+  ORDER.forEach(function(id){var P=PEOPLE[id];
+   tiles+='<div style="flex:1;background:'+INK+';color:'+IV+';padding:12px 18px;display:flex;flex-direction:column;gap:8px;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center"><p style="font-size:36px;font-weight:700;line-height:1">'+P.name+'</p><div style="width:26px;height:26px;border-radius:50%;background:'+P.col+';border:3px solid '+IV+'"></div></div><div style="display:flex;align-items:center;gap:10px"><div style="flex:1;height:22px;background:#2B2B2B"><div id="b'+n+'_'+id+'" style="height:22px;width:0;background:'+(P.col===INK?IV:P.col)+';transition:width .6s"></div></div><div class="bn" id="n'+n+'_'+id+'" style="font-size:28px;font-weight:700;min-width:36px;text-align:right">0</div></div></div>'});
+  function stat(l,id,sub){return '<div style="flex:1;background:'+INK+';color:'+IV+';padding:12px 22px"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+YEL+'">'+l+'</p><p id="'+id+'" class="num" style="font-size:52px;font-weight:700;line-height:1.05">&ndash;</p><p id="'+id+'s" style="font-size:24px;color:#CFC8B4">'+sub+'</p></div>'}
+  d.el.innerHTML='<section style="background:'+S.bg+';color:'+S.fg+';width:1920px;height:1080px;position:relative;padding:30px 80px 24px;display:flex;flex-direction:column;gap:14px">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:16px;align-items:center">'+tagH(S,n)+'</div><div style="display:flex;gap:22px;align-items:baseline"><p id="sw'+n+'" class="num" style="font-size:80px;font-weight:700;line-height:1">0:00</p><p style="font-size:26px;font-weight:700">on the clock</p><p id="cn'+n+'" class="num" style="font-size:80px;font-weight:700;line-height:1">0</p><p id="co'+n+'" style="font-size:26px;font-weight:700">answered</p></div></div>'+
+  '<div style="background:'+IV+';color:'+INK+';flex:1;display:flex;gap:44px;padding:22px 48px;min-height:0;overflow:hidden"><div style="flex:1.9;display:flex;flex-direction:column;gap:16px"><h2 style="font-size:56px;font-weight:700;line-height:1.05">'+S.title+'</h2><p style="font-size:31px;line-height:1.28">'+S.story+'</p></div><div style="flex:1;display:flex;flex-direction:column;gap:12px;justify-content:center">'+factsH(S)+'</div></div>'+
+  '<div style="display:flex;gap:12px">'+stat('Average time to choose','avg','seconds, from opening the question')+stat('Fastest','fast','')+stat('The room’s top pick','top','')+'</div>'+
+  '<div style="display:flex;gap:12px">'+tiles+'</div>'+
+  '<p id="hn'+n+'" style="font-size:28px;font-weight:700">Look at the five people on the earlier slide, or on your phone. Pick who fits best.</p></section>';
+  d.render=function(){if(d.iv)clearInterval(d.iv);d.t0=null;var sw=$('sw'+n);if(sw)sw.textContent='0:00';d.iv=setInterval(function(){if(DEF[idx]!==d)return;var ph=V&&V.state?V.state.phase:'idle';if(ph==='open'){if(!d.t0)d.t0=Date.now();var s=Math.floor((Date.now()-d.t0)/1000);sw.textContent=Math.floor(s/60)+':'+('0'+s%60).slice(-2)}},400)};
+  d.upd=function(){var r=V.currentResults;if(!r||r.id!==S.act)return;var max=Math.max(r.joined,r.submitted,1);
+   bump($('cn'+n),r.submitted);$('co'+n).textContent='of '+r.joined+' answered';$('st'+n).textContent=V.state.phase==='open'?'Open: vote on your phone':V.state.phase==='revealed'?'Final':'Closed';
+   var top=null;(r.options||[]).forEach(function(o){var bb=$('b'+n+'_'+o.id),nn=$('n'+n+'_'+o.id);if(!bb)return;bb.style.width=Math.round(o.count/max*100)+'%';var t=String(o.count);if(nn.textContent!==t){nn.textContent=t;nn.classList.remove('grew');void nn.offsetWidth;nn.classList.add('grew')}if(o.count>0&&(!top||o.count>top.count))top=o});
+   var tm=r.timing;if(tm){$('avg').textContent=tm.avgSeconds+' s';$('avgs').textContent='average, '+tm.n+' people';$('fast').textContent=tm.fastestSeconds+' s';$('fasts').textContent='chose '+(PEOPLE[tm.fastestChoice]?PEOPLE[tm.fastestChoice].name:'someone')}
+   if(top){$('top').textContent=PEOPLE[top.id]?PEOPLE[top.id].name:top.name;$('tops').textContent=top.count+' of '+r.submitted+' votes ('+top.pct+'%)'}
+   $('hn'+n).textContent=V.state.phase==='open'?'Look at the five people on the earlier slide, or on your phone. Pick who fits best.':'Now we put the room’s question into the system. Next slide.'};
+};
+function bump(e,n){if(!e)return;var t=String(n);if(e.textContent!==t){e.textContent=t;e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop')}}
+
+/* ---------- overlays on static slides (live counts) ---------- */
+function addOverlay(d){
+  var sec=d.el.querySelector('section');
+  if(d.over==='interest'){var o=el('<div id="ovbox_i" style="position:absolute;left:112px;bottom:36px;background:'+IV+';color:'+INK+';padding:10px 22px;font-size:30px;font-weight:700;display:flex;gap:14px;align-items:baseline"><span id="ov_i" class="num" style="font-size:60px;line-height:1">0</span><span>tapped interested so far</span></div>');o.style.display='none';sec.appendChild(o);
+   d.upd=function(){var r=V.currentResults;if(!r||r.id!=='interest')return;var n=(r.options||[]).filter(function(x){return x.id!=='notnow'}).reduce(function(a,x){return a+x.count},0);bump($('ov_i'),n)}}
+  if(d.over==='rate'){var o2=el('<div style="position:absolute;right:112px;bottom:96px;width:760px;background:'+IV+';color:'+INK+';padding:20px 26px;display:flex;flex-direction:column;gap:8px"><p style="font-size:30px;font-weight:700">Rate the talk on your phone</p><div id="ov_r" style="display:flex;gap:10px;align-items:flex-end;height:150px"></div><p id="ov_t" style="font-size:26px;color:#5A564C"></p></div>');sec.appendChild(o2);
+   d.upd=function(){var r=V.currentResults;if(!r||r.id!=='rate')return;var mx=Math.max(1,Math.max.apply(null,(r.options||[]).map(function(x){return x.count})));$('ov_r').innerHTML=(r.options||[]).map(function(x){return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px"><span style="font-size:26px;font-weight:700">'+x.count+'</span><div style="width:100%;height:'+Math.round(x.count/mx*90)+'px;background:'+YEL+';transition:height .6s"></div><span style="font-size:24px;font-weight:700">'+x.id+'</span></div>'}).join('');var tot=(r.options||[]).reduce(function(a,x){return a+x.count},0),sm=(r.options||[]).reduce(function(a,x){return a+x.count*Number(x.id)},0);$('ov_t').textContent=tot?tot+' ratings · average '+(sm/tot).toFixed(1):'Waiting for the first rating'}}
+}
+
+/* ---------- the demo (scenario 3 goes into the system) ---------- */
+var DEMO={sel:2,chosen:null,res:null,reply:null,n:2};
+var STATS={selorm:{path:{next:'Senior researcher',items:[['Led a project end to end',1],['Steady on-time delivery',1],['Mentored a newer colleague',1],['Led a cross-team project',0],['Completed advanced training',0]]},done:[9,13],ontime:[86,93],steady:[3,6],range:{label:'On time',best:96,now:93,worst:78},cats:[['Finishes what they start',30],['Speed',45],['Consistency',40],['Asks for help early',20]]},
+           kofi:{path:{next:'Team lead',items:[['Ran a partner workshop',1],['Trusted by clients',1],['Led a small team for a month',0],['Completed people-lead training',0]]},done:[11,14],ontime:[80,88],steady:[2,4],range:{label:'On time',best:91,now:88,worst:72},cats:[['Finishes what they start',45],['Speed',40],['Consistency',55],['Asks for help early',15]]}};
+var JOBS_NOW={selorm:[['Customer feedback synthesis',3],['New-hire buddy',1],['Quarterly research brief',2]],kofi:[['Partner workshop',3],['Customer story for the website',2],['Team offsite follow-up',1]]};
+BUILD.demo=function(d){d.el.innerHTML='<div class="dm" id="dm"></div>';d.render=renderDemo};
+function pillH(t,bg,fg){return '<span class="pill" style="background:'+bg+';color:'+fg+'">'+t+'</span>'}
+function renderDemo(){
+  var dm=$('dm'),S=SC[DEMO.sel],h='';
+  var head='<div style="display:flex;align-items:center;gap:20px">'+pillH('Live demo',GRN,IV)+'<p style="font-size:28px;font-weight:700;color:#CFC8B4">Scenario 3 goes into the system.</p></div>';
+  if(step===0){
+    var chips=SC.map(function(s,i){return '<div data-sc="'+i+'" style="cursor:pointer;padding:12px 26px;font-size:30px;font-weight:700;border-radius:99px;border:3px solid '+YEL+';'+(i===DEMO.sel?'background:'+YEL+';color:'+INK:'color:'+YEL)+'">Scenario '+s.n+'</div>'}).join('');
+    var bars=DIMS.map(function(x){return '<div style="display:flex;align-items:center;gap:18px"><p style="font-size:28px;width:300px">'+DL[x]+'</p><div style="flex:1;height:22px;background:#2B2B2B"><div style="width:'+S.w[x]*10+'%;height:100%;background:'+YEL+'"></div></div><p style="font-size:24px;color:#CFC8B4;width:150px">importance '+S.w[x]+'</p></div>'}).join('');
+    h=head+'<h2 class="serif">A manager adds a job.</h2><div style="display:flex;gap:14px">'+chips+'</div><div style="display:flex;gap:48px;flex:1"><div style="flex:1.15;background:'+IV+';color:'+INK+';padding:36px 40px;display:flex;flex-direction:column;gap:18px"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C">New job</p><p style="font-size:48px;font-weight:700;line-height:1.1">'+S.title+'</p><p style="font-size:30px;line-height:1.3">'+S.text+'</p><div style="display:flex;gap:12px">'+S.tags.map(function(t){return '<span class="chip" style="background:#E9E3D3">'+t+'</span>'}).join('')+'</div><div style="margin-top:auto"><span class="btn pri" id="find">Find the best fit &rarr;</span></div></div><div style="flex:1;display:flex;flex-direction:column;gap:14px;justify-content:center"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+YEL+'">What the job needs</p>'+bars+'<p style="font-size:26px;color:#CFC8B4;margin-top:6px">Compared against five people: their working style and time free.</p></div></div>';
+  } else if(step===1){
+    var res=DEMO.res=match(S),N=DEMO.n,top=res.slice(0,N),rest=res.slice(N);
+    var words=['','one','two','three'];
+    var sel='<div style="display:flex;gap:10px;align-items:center"><p style="font-size:26px;color:#CFC8B4">Manager asks for the top:</p>'+[1,2,3].map(function(k){return '<div data-n="'+k+'" style="cursor:pointer;padding:6px 22px;font-size:28px;font-weight:700;border-radius:99px;border:3px solid '+YEL+';'+(k===N?'background:'+YEL+';color:'+INK:'color:'+YEL)+'">'+k+'</div>'}).join('')+'</div>';
+    var rr=(V&&V.allResults||[]).filter(function(x){return x.id===S.act})[0],roomLine='';
+    if(rr&&rr.submitted){var tp=null;(rr.options||[]).forEach(function(o){if(!tp||o.count>tp.count)tp=o});if(tp&&PEOPLE[tp.id]){var inT=top.some(function(r){return r.id===tp.id});roomLine=' The room’s top pick was '+PEOPLE[tp.id].name+' ('+tp.count+' of '+rr.submitted+'): '+(inT?'in the system’s list.':'not in the system’s list. You may disagree, and that is fine.')}}
+    h=head+'<div style="display:flex;justify-content:space-between;align-items:flex-end"><h2 class="serif" style="font-size:'+(N===3?72:84)+'px">The system narrows it to '+words[N]+'.</h2>'+sel+'</div><div style="display:flex;gap:24px;flex:1;min-height:0">'+top.map(function(r,i){var P=PEOPLE[r.id];return '<div style="flex:1;background:'+IV+';color:'+INK+';padding:22px 28px;display:flex;flex-direction:column;gap:10px;border-top:14px solid '+P.col+'"><div style="display:flex;justify-content:space-between;align-items:baseline"><p style="font-size:56px;font-weight:700;line-height:1">'+P.name+'</p><p style="font-size:30px;font-weight:700">Fit '+Math.round(r.score*100)+'%</p></div><p style="font-size:24px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5A564C">'+P.role+(i===0?' · closest match':'')+'</p><div style="height:16px;background:#D9D0B8"><div style="width:'+Math.round(r.score*100)+'%;height:100%;background:'+P.col+'"></div></div><p style="font-size:28px;font-weight:700">Why:</p><div style="display:flex;flex-direction:column;gap:6px">'+r.good.map(function(g){return '<p style="font-size:28px;line-height:1.2">● '+P.name+' '+g+'.</p>'}).join('')+'</div>'+(r.watch?'<p style="font-size:26px;color:#5A564C;line-height:1.25">Keep in mind: '+r.watch+'.</p>':'')+'<div style="margin-top:auto"><span class="btn pri" data-pick="'+r.id+'">Choose '+P.name+'</span></div></div>'}).join('')+'</div>'+
+    (rest.length?'<div style="background:#1C1C1C;padding:14px 24px;display:flex;flex-direction:column;gap:4px"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+YEL+'">Not in the list, and why</p>'+rest.map(function(r){return '<p style="font-size:26px;line-height:1.2;color:'+IV+'"><b>'+PEOPLE[r.id].name+'</b> ('+Math.round(r.score*100)+'%) '+r.why+'.</p>'}).join('')+'</div>':'')+
+    '<p style="font-size:26px;color:#CFC8B4">The manager decides, not the system.'+roomLine+'</p>';
+  } else if(step===2||step===3){
+    var id=DEMO.chosen||(DEMO.res?DEMO.res[0].id:'selorm'),P=PEOPLE[id];var jobs=JOBS_NOW[id]||JOBS_NOW.selorm;
+    var load=jobs.reduce(function(a,j){return a+j[1]},0),before=Math.min(10,load+1),after=Math.min(10,before+3);
+    var phone;
+    if(step===2){
+      var rep=DEMO.reply;
+      phone='<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C">Hi '+P.name+'</p><div style="background:'+RED+';color:'+IV+';padding:16px 22px"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+YEL+'">You have been offered a job</p><p style="font-size:34px;font-weight:700;line-height:1.1;margin-top:4px">'+S.title+'</p><p style="font-size:26px;margin-top:6px">Four months · team of five · customer calls</p></div><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C;margin-top:8px">Your week now</p>'+jobs.map(function(j){return '<div style="display:flex;justify-content:space-between;font-size:28px;border-bottom:2px solid #D9D0B8;padding:6px 0"><span>'+j[0]+'</span><span>'+j[1]+(j[1]===1?' day':' days')+'</span></div>'}).join('')+
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px"><p style="font-size:26px;font-weight:700">Workload: '+before+' of 10 now, '+after+' of 10 with this job</p><div style="display:flex;height:26px;background:#D9D0B8"><div style="width:'+before*10+'%;background:'+GRN+'"></div><div style="width:'+(after-before)*10+'%;background:'+YEL+'"></div></div></div>'+
+      (rep?'<div style="background:'+GRN+';color:'+IV+';padding:18px 22px;font-size:30px;font-weight:700;line-height:1.25;margin-top:6px">'+rep+'</div>':'<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px"><span class="btn pri" data-reply="accept">Accept the job</span><span class="btn" data-reply="lead">Ask my team lead a question</span><span class="btn" data-reply="hr">Talk to HR</span></div>');
+    } else {
+      var st=STATS[id]||STATS.selorm;
+      phone='<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C">Your progress · only you see this</p><div style="display:flex;gap:14px"><div style="flex:1;background:'+IV+';padding:14px 18px;border:3px solid '+INK+'"><p style="font-size:24px;color:#5A564C">Tasks done</p><p style="font-size:48px;font-weight:700">'+st.done[1]+' <span style="font-size:26px;font-weight:500;color:#5A564C">vs '+st.done[0]+' last month</span></p></div><div style="flex:1;background:'+IV+';padding:14px 18px;border:3px solid '+INK+'"><p style="font-size:24px;color:#5A564C">On time</p><p style="font-size:48px;font-weight:700">'+st.ontime[1]+'% <span style="font-size:26px;font-weight:500;color:#5A564C">vs '+st.ontime[0]+'%</span></p></div></div><p style="font-size:26px;font-weight:700">Steady weeks in a row: '+st.steady[1]+' <span style="font-weight:500;color:#5A564C">(was '+st.steady[0]+')</span></p><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C;margin-top:6px">Your own range</p><p style="font-size:28px;font-weight:700">'+st.range.label+': best '+st.range.best+'% <span style="font-weight:500;color:#5A564C">· now</span> '+st.range.now+'% <span style="font-weight:500;color:#5A564C">· worst</span> '+st.range.worst+'%</p><div style="background:'+GRN+';color:'+IV+';padding:14px 20px"><p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+IV+'">Your standout skill</p><p style="font-size:34px;font-weight:700;line-height:1.15">'+(function(){var b=st.cats.slice().sort(function(x,y){return x[1]-y[1]})[0];return b[0]+' · top '+b[1]+'% in the company'})()+'</p><p style="font-size:24px">No names. Just where your strength stands.</p></div>'+(function(){var p=st.path,met=p.items.filter(function(x){return x[1]}).length,tot=p.items.length;return '<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#5A564C;margin-top:8px">Your path to '+p.next+'</p><div style="display:flex;height:22px;background:#D9D0B8"><div style="width:'+Math.round(met/tot*100)+'%;background:'+GRN+'"></div></div><p style="font-size:26px;font-weight:700">'+met+' of '+tot+' criteria met <span style="font-weight:500;color:#5A564C">· next: '+p.items.filter(function(x){return !x[1]})[0][0]+'</span></p>'})();
+    }
+    var side=step===2?'<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+YEL+'">What the manager sees</p><p style="font-size:44px;font-weight:700;line-height:1.15">'+(DEMO.reply?(DEMO.reply.indexOf('Accepted')===0?P.name+' accepted. Added to their week.':DEMO.reply.indexOf('Question')===0?P.name+' has a question for their team lead.':P.name+' asked to talk to HR first.'):'Offered to '+P.name+'. Waiting for a reply.')+'</p><p style="font-size:30px;line-height:1.35;color:#CFC8B4">The person sees their whole week and the load before they say yes. They can ask for clarity first, from their team lead or HR.</p>'
+      :'<p style="font-size:24px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:'+YEL+'">Not a leaderboard</p><p style="font-size:44px;font-weight:700;line-height:1.15">Compete with your own best, and see where your strengths stand.</p><p style="font-size:30px;line-height:1.35;color:#CFC8B4">No names, no ranking list. It shows people their own best and worst, the skill that makes them stand out in the company, and the published criteria for their next step. People decide promotions, by those criteria. We aim to reward consistency and early flags.</p>';
+    h=head+'<h2 class="serif">'+(step===2?P.name+' gets the offer.':P.name+' sees their own progress.')+'</h2><div style="display:flex;gap:70px;flex:1"><div style="width:760px;background:'+IV+';color:'+INK+';padding:34px 36px;display:flex;flex-direction:column;gap:14px;border-radius:28px;border:6px solid '+P.col+'">'+phone+'</div><div style="flex:1;display:flex;flex-direction:column;gap:22px;justify-content:center">'+side+'</div></div>';
+  }
+  dm.innerHTML=h+'<p style="position:absolute;right:96px;bottom:26px;font-size:24px;color:#8A8473">Step '+(step+1)+' of 4 · right arrow to continue</p>';
+  var f=$('find');if(f)f.onclick=function(){step=1;renderDemo()};
+  dm.querySelectorAll('[data-n]').forEach(function(c){c.onclick=function(){DEMO.n=+c.getAttribute('data-n');DEMO.chosen=null;renderDemo()}});
+  dm.querySelectorAll('[data-sc]').forEach(function(c){c.onclick=function(){DEMO.sel=+c.getAttribute('data-sc');renderDemo()}});
+  dm.querySelectorAll('[data-pick]').forEach(function(c){c.onclick=function(){DEMO.chosen=c.getAttribute('data-pick');DEMO.reply=null;step=2;renderDemo();status()}});
+  dm.querySelectorAll('[data-reply]').forEach(function(c){c.onclick=function(){var k=c.getAttribute('data-reply');DEMO.reply=k==='accept'?'Accepted. It is added to your week.':k==='lead'?'Question sent to your team lead. Nothing changes until you decide.':'HR will contact you to talk it through first.';renderDemo()}});
+}
+
+/* ---------- navigation, polling control ---------- */
+function api(act,id){return fetch('/api/host/s/'+code+'/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:act,activityId:id})}).then(function(r){return r.json().catch(function(){return {}})})}
+function status(){$('pos').textContent=(idx+1)+' / '+DEF.length+'  '+DEF[idx].id;var ph=V&&V.state?V.state.phase:'idle';$('phase').textContent=ph;$('phase').className=ph;$('live').textContent=V?V.joined+' joined':'';var d=DEF[idx];$('notes').textContent=(d.note||'').replace(/\s*\u2022\s*/g,'\n\u2022 ').replace(/\s+(\d\)\s)/g,'\n$1').replace(/\s+(CAREFUL:|UNIVERSITY CAREFUL:)/g,'\n\n$1').trim();}
+function pushSlide(){ if(!live)return; fetch('/api/host/s/'+code+'/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'slide',idx:idx,step:step,total:DEF.length,ov:OV})}).catch(function(){}); }
+function show(i,s){
+  var pv=DEF[idx].el.querySelector('video');if(pv)pv.pause();
+  OV=0; DEF[idx].el.classList.remove('on'); idx=i; step=s||0; var d=DEF[idx]; d.el.classList.add('on');
+  if(d.render)d.render();
+  var br=document.getElementById('brand'); if(br)br.style.display=(d.img||d.id==='about')?'none':'block';
+  if(!SHOW&&d.act&&live){ if(d.act==='__idle')api('idle'); else api('open',d.act); }
+  if(!SHOW&&d.post&&live){ d.post.reduce(function(p,a){return p.then(function(){return api(a)})},Promise.resolve()); }
+  applyOV();
+  if(!SHOW)pushSlide();
+  if(d.upd&&V)d.upd();
+  status();
+}
+function next(){var d=DEF[idx];if(d.steps&&step<d.steps-1){if(step===1&&!DEMO.chosen&&DEMO.res)DEMO.chosen=DEMO.res[0].id;step++;d.render();status();pushSlide();return}if(idx<DEF.length-1)show(idx+1,0)}
+function prev(){var d=DEF[idx];if(d.steps&&step>0){step--;d.render();status();pushSlide();return}if(idx>0)show(idx-1,0)}
+var OV=0;
+function applyOV(){var b=$('ovbox_i');if(b)b.style.display=(OV&&DEF[idx]&&DEF[idx].over==='interest')?'flex':'none';var bt=$('bCount');if(bt)bt.textContent=OV?'Hide count (I)':'Show count (I)'}
+function toggleCount(){var d=DEF[idx];if(!d||d.over!=='interest')return;OV=OV?0:1;applyOV();pushSlide()}
+document.addEventListener('keydown',function(e){
+ if(SHOW){if(e.key==='f'||e.key==='F'){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}return}
+ if(e.target&&e.target.tagName==='INPUT')return;
+ var k=e.key;
+ if(k==='ArrowRight'||k===' '||k==='PageDown'){e.preventDefault();next()}
+ else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();prev()}
+ else if(k==='o'||k==='O'){var d=DEF[idx];if(d.act&&d.act!=='__idle')api('open',d.act)}
+ else if(k==='c'||k==='C')api('close');
+ else if(k==='r'||k==='R')api('reveal');
+ else if(k==='n'||k==='N')$('notes').classList.toggle('on');
+ else if(k==='f'||k==='F'){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}
+ else if(k==='h'||k==='H')$('bar').classList.toggle('hide');
+ else if(k==='i'||k==='I')toggleCount();
+});
+$('bProj').onclick=function(){var u=location.origin+'/show/'+code+'?k='+(V&&V.screenKey||'');try{navigator.clipboard.writeText(u)}catch(e){}prompt('Open this on the projector laptop (copied if your browser allows):',u)};$('bCount').onclick=toggleCount;$('bPrev').onclick=prev;$('bNext').onclick=next;$('bOpen').onclick=function(){var d=DEF[idx];if(d.act&&d.act!=='__idle')api('open',d.act)};$('bClose').onclick=function(){api('close')};$('bRev').onclick=function(){api('reveal')};$('bNotes').onclick=function(){$('notes').classList.toggle('on')};$('bFull').onclick=function(){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()};$('bHide').onclick=function(){$('bar').classList.add('hide')};
+
+var tx=0;stage.addEventListener('touchstart',function(e){tx=e.changedTouches[0].clientX},{passive:true});stage.addEventListener('touchend',function(e){if(SHOW)return;var dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>60){if(dx<0)next();else prev()}},{passive:true});
+function fitStage(){var s=Math.min(innerWidth/1920,(innerHeight-(SHOW?0:44))/1080);stage.style.transform='scale('+s+')'}
+addEventListener('resize',fitStage);fitStage();
+
+function connect(){
+  var es=new EventSource('/api/host/s/'+code+'/stream');
+  es.addEventListener('host',function(e){V=JSON.parse(e.data);live=true;$('dot').className='ok';var d=DEF[idx];if(d&&d.upd)d.upd();status()});
+  es.onerror=function(){live=false;$('dot').className=''};
+}
+function bootShow(){
+  var built=false, es=new EventSource('/api/screen/'+code+'/stream?k='+encodeURIComponent(KEY));
+  es.addEventListener('host',function(e){
+    V=JSON.parse(e.data); live=true;
+    function apply(){ var sl=V.slide||{idx:0,step:0}; if(sl.idx!==idx||!built){ show(Math.min(sl.idx,DEF.length-1),sl.step||0); } else if(sl.step!==step&&DEF[idx].steps){ step=sl.step; DEF[idx].render&&DEF[idx].render(); } OV=sl.ov?1:0; applyOV(); var d=DEF[idx]; if(d&&d.upd)d.upd(); }
+    if(!built){ buildAll().then(function(){ built=true; apply(); }); } else apply();
+  });
+  es.onerror=function(){live=false};
+}
+function boot(){
+  fetch('/api/host/s/'+code+'/view').then(function(r){
+    if(r.status===401){$('login').style.display='flex';return null}
+    if(r.status===404){document.body.innerHTML='<p style="color:#fff;font:24px sans-serif;padding:40px">Session '+esc(code)+' not found. Create one in the organiser page.</p>';return null}
+    return r.json()}).then(function(v){if(!v)return;$('login').style.display='none';V=v;buildAll().then(function(){connect();var sl=v.slide||{idx:0,step:0};show(Math.max(0,Math.min(sl.idx||0,DEF.length-1)),sl.step||0)});});
+}
+$('go').onclick=function(){fetch('/api/host/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('pw').value})}).then(function(r){if(r.ok)boot();else $('lerr').textContent='Wrong password'})};
+$('pw').addEventListener('keydown',function(e){if(e.key==='Enter')$('go').click()});
+window.__present={DEF:DEF,match:match,SC:SC,next:next,prev:prev,show:show,state:function(){return {idx:idx,step:step}}};
+if(SHOW){bootShow();document.addEventListener('dblclick',function(){if(!document.fullscreenElement)document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()})}else boot();
+})();
+</script>
+</body>
+</html>

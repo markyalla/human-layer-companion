@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Human Layer Organiser</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+:root{--ink:#0B0B0B;--ivory:#FBF8F0;--card:#FFFFFF;--line:#D9D0B8;--muted:#5A564C;--red:#C8111F;--green:#17692B;--yellow:#F8B808;--grey:#E9E3D3}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ivory);color:var(--ink);font:16px/1.45 "DM Sans",system-ui,sans-serif}
+body{padding:16px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+main{max-width:1100px;margin:0 auto}
+h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:0 0 10px}h3{font-size:15px;margin:14px 0 6px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 14px;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+button,.btn{font:inherit;font-weight:700;border:2px solid var(--ink);background:var(--ink);color:var(--ivory);border-radius:10px;padding:10px 14px;cursor:pointer;min-height:44px;text-decoration:none;display:inline-block}
+button.alt,.btn.alt{background:transparent;color:var(--ink)}
+button.red{background:var(--red);border-color:var(--red);color:#fff}
+button.green{background:var(--green);border-color:var(--green);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+.bar{display:flex;gap:8px;flex-wrap:wrap}
+input,select,textarea{font:inherit;padding:10px;border:2px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);max-width:100%}
+textarea{width:100%;font:13px/1.4 ui-monospace,Menlo,monospace;min-height:260px}
+.muted{color:var(--muted);font-size:14px}
+.pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700;background:var(--grey)}
+.pill.live{background:var(--green);color:#fff}.pill.open{background:var(--yellow)}.pill.bad{background:var(--red);color:#fff}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat b{display:block;font-size:30px;line-height:1.05;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.row{display:grid;grid-template-columns:minmax(90px,150px) 1fr 90px;gap:8px;align-items:center;margin:5px 0;font-size:14px}
+.track{background:var(--grey);border-radius:6px;height:20px;overflow:hidden}.fill{height:100%;background:var(--red);transition:width .3s}
+.fill.g{background:var(--green)}.fill.y{background:var(--yellow)}
+.acts button{margin:0 6px 6px 0;min-height:40px;padding:8px 12px;font-size:14px}
+.acts button.cur{background:var(--yellow);color:var(--ink);border-color:var(--ink)}
+.url{font:14px ui-monospace,Menlo,monospace;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;word-break:break-all}
+img.qr{width:220px;max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+.err{color:var(--red);font-weight:700}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{border-bottom:1px solid var(--line);padding:6px;text-align:left}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<div style="max-width:1100px;margin:0 auto 6px"><img src="/present/logo.png" alt="Gold Coast Games" width="48" height="48" style="display:block"></div>
+<main id="app"></main>
+<script>
+(function(){
+'use strict';
+var app=document.getElementById('app');
+var V=null, code=null, sessions=[], es=null, live=false, msg='', cmpA='', cmpB='', edText=null, authed=null, editorDirty=false, poll=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function j(path,body){
+  var o=body===undefined?{credentials:'same-origin'}:{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
+  return fetch(path,o).then(function(r){return r.json().catch(function(){return {}}).then(function(b){if(r.status===401){authed=false;render()} return {status:r.status,body:b}})}).catch(function(){return {status:0,body:{error:'network'}}});
+}
+function ago(t){if(!t)return 'never';var s=Math.max(0,Math.round((Date.now()-t)/1000));return s<60?s+'s ago':Math.round(s/60)+' min ago'}
+function origin(){return location.origin}
+function joinUrl(c){return origin()+'/j/'+c}
+
+function loadSessions(){return j('/api/host/sessions').then(function(r){if(r.status===200){authed=true;sessions=r.body}else if(r.status===401)authed=false;render()})}
+function open(c){
+  code=c; V=null; editorDirty=false; edText=null; render();
+  if(es){es.close();es=null}
+  es=new EventSource('/api/host/s/'+c+'/stream');
+  es.addEventListener('host',function(e){V=JSON.parse(e.data);live=true;render()});
+  es.onerror=function(){live=false;render()};
+  if(poll)clearInterval(poll);
+  poll=setInterval(function(){ if(!live&&code) j('/api/host/s/'+code+'/view').then(function(r){if(r.status===200){V=r.body;render()}}) },4000);
+}
+function act(a,extra){
+  var body=Object.assign({action:a},extra||{});
+  j('/api/host/s/'+code+'/action',body).then(function(r){msg=r.status===200?'':'Action failed: '+(r.body.error||r.status);if(!live)j('/api/host/s/'+code+'/view').then(function(x){if(x.status===200){V=x.body}render()});else render()});
+}
+
+function barRows(items,cls){return items.map(function(o){return '<div class="row"><span>'+esc(o.name)+'</span><div class="track"><div class="fill '+(cls||'')+'" style="width:'+o.pct+'%"></div></div><span>'+o.count+' · '+o.pct+'%</span></div>'}).join('')}
+function resultsHtml(r){
+  if(!r) return '<p class="muted">No activity open.</p>';
+  var h='<div class="stats"><div class="stat"><b>'+r.joined+'</b><span>Joined</span></div><div class="stat"><b>'+r.opened+'</b><span>Opened this activity</span></div><div class="stat"><b>'+r.submitted+'</b><span>Submitted</span></div></div>';
+  if(r.arms){
+    ['plain','timed'].forEach(function(k){var a=r.arms[k];h+='<h3>'+(k==='plain'?'No timer':'60-second countdown')+'</h3><p class="muted">Opened '+a.opened+' · finished '+a.finished+' · '+(a.pctOfOpened==null?'n/a':a.pctOfOpened+'% of those who opened it')+' · median '+(a.medianSeconds==null?'n/a':a.medianSeconds+'s')+'</p>'});
+    if(r.correctList&&r.correctList.length) h+='<p><b>Got it right, in order:</b> '+r.correctList.map(esc).join(', ')+'</p>';
+    if(r.firstCorrect) h+='<p><b>First to pick '+esc(r.answerName)+' (golden apple):</b> '+esc(r.firstCorrect.label)+(r.firstCorrect.seconds!=null?' in '+r.firstCorrect.seconds+'s':'')+' · '+r.correct+' picked '+esc(r.answerName)+'</p>';
+    if(r.firstTimedFinisher) h+='<p><b>Fastest to finish onboarding (golden apple):</b> '+esc(r.firstTimedFinisher.label)+' in '+r.firstTimedFinisher.seconds+'s'+(r.firstTimedFinisher.cohort?' · cohort '+r.firstTimedFinisher.cohort:'')+'</p>';
+  }
+  if(r.options){ h+='<h3>Choices (of '+r.submitted+' submitted)</h3>'+(r.submitted?barRows(r.options):'<p class="muted">No responses yet.</p>'); }
+  if(r.reasons){ h+='<h3>What mattered (of '+r.reasonsDenominator+' who gave a reason)</h3>'+(r.reasonsDenominator?barRows(r.reasons,'g'):'<p class="muted">None yet.</p>'); }
+  return h;
+}
+function compareHtml(){
+  var choice=V.allResults.filter(function(r){return r.kind==='choice'});
+  if(choice.length<2) return '';
+  if(!cmpA||!choice.some(function(r){return r.id===cmpA}))cmpA=choice[0].id;
+  if(!cmpB||!choice.some(function(r){return r.id===cmpB}))cmpB=choice[1].id;
+  var A=choice.find(function(r){return r.id===cmpA}),B=choice.find(function(r){return r.id===cmpB});
+  function sel(id,which){return '<select data-cmp="'+which+'">'+choice.map(function(r){return '<option value="'+esc(r.id)+'"'+(r.id===id?' selected':'')+'>'+esc(r.title)+' ('+r.submitted+')</option>'}).join('')+'</select>'}
+  var names={};(A.options||[]).concat(B.options||[]).forEach(function(o){names[o.id]=o.name});
+  var rows=Object.keys(names).map(function(id){var a=(A.options||[]).find(function(o){return o.id===id}),b=(B.options||[]).find(function(o){return o.id===id});
+    return '<tr><td>'+esc(names[id])+'</td><td>'+(a?a.count+' · '+a.pct+'%':'–')+'</td><td>'+(b?b.count+' · '+b.pct+'%':'–')+'</td></tr>'}).join('');
+  return '<div class="card"><h2>Compare rounds</h2><div class="bar">'+sel(cmpA,'A')+sel(cmpB,'B')+'</div><div class="scroll"><table><tr><th>Option</th><th>'+esc(A.title)+' (of '+A.submitted+')</th><th>'+esc(B.title)+' (of '+B.submitted+')</th></tr>'+rows+'</table></div><p class="muted">Percentages use each round’s own submitted count as the denominator. Participants who skipped a round are not counted in it.</p></div>';
+}
+
+function sessionHtml(){
+  if(!V) return '<p class="muted">Connecting…</p>';
+  var st=V.state, cur=V.current, curId=st.activityId, ph=st.phase;
+  var jurl=joinUrl(V.code), surl=origin()+'/screen/'+V.code+'?k='+V.screenKey;
+  var h='<div class="top"><div><button class="alt" id="back">← Sessions</button></div><div><span class="pill '+(live?'live':'bad')+'">'+(live?'Live updates on':'Live updates OFF (polling)')+'</span></div></div>';
+  h+='<div class="card"><h1>'+esc(V.name)+'</h1><p class="muted">Code <b>'+esc(V.code)+'</b> · '+(V.privacy==='named'?'Names collected':'Aggregate only (no names)')+' · status <span class="pill '+(V.status==='live'?'live':'')+'">'+esc(V.status)+'</span> · phase <span class="pill '+(ph==='open'?'open':'')+'">'+esc(ph)+'</span></p>'+(msg?'<p class="err">'+esc(msg)+'</p>':'')+'</div>';
+  h+='<div class="grid"><div class="card"><h2>Join</h2><img class="qr" alt="QR code for the join link" src="/qr.svg?u='+encodeURIComponent(jurl)+'"><p class="url">'+esc(jurl)+'</p><div class="bar"><button class="alt" id="cp">Copy join link</button><a class="btn alt" target="_blank" href="'+esc(surl)+'">Open big screen</a></div><p class="muted">One QR code for this whole session. Keep it on screen until the room has joined.</p></div>';
+  h+=(V.orgMix&&V.orgMix.length?'<div class="card"><h2>Who is in the room</h2><p>'+V.orgMix.map(function(o){return esc(o.name)+' <b>'+o.count+'</b>'}).join(' &middot; ')+'</p><p class="muted">From the onboarding tap. Counts only people who answered it.</p></div>':'');
+  h+='<div class="card"><h2>Taking part</h2><p style="font-size:20px"><b>'+V.joined+'</b> joined'+(V.audience?' of about <b>'+V.audience+'</b> in the room (<b>'+Math.round(V.joined/V.audience*100)+'%</b>)':'')+' &middot; <b>'+V.engaged+'</b> answered at least one thing &middot; <b>'+V.connected+'</b> phones connected now</p><div class="bar"><input id="au" type="number" min="0" max="5000" placeholder="People in the room (about)" value="'+(V.audience||'')+'" style="max-width:220px"><button id="aus">Set room size</button></div></div>';
+  h+='<div class="card"><h2>Right now</h2><div class="stats"><div class="stat"><b>'+V.joined+'</b><span>Joined</span></div><div class="stat"><b>'+V.connected+'</b><span>Phones connected</span></div><div class="stat"><b>'+(V.currentResults?V.currentResults.opened:0)+'</b><span>Opened current</span></div><div class="stat"><b>'+(V.currentResults?V.currentResults.submitted:0)+'</b><span>Submitted current</span></div></div><p class="muted">Last response: '+ago(V.lastResponseAt)+'</p>';
+  h+='<h3>Controls</h3><div class="bar"><button class="green" data-a="resume"'+(ph==='paused'||ph==='closed'?'':' disabled')+'>Reopen</button><button data-a="pause"'+(ph==='open'?'':' disabled')+'>Pause</button><button class="red" data-a="close"'+(ph==='open'||ph==='paused'?'':' disabled')+'>Close submissions</button><button data-a="reveal"'+(curId?'':' disabled')+'>Reveal results</button></div><div class="bar" style="margin-top:8px"><button class="alt" data-a="prev">← Previous</button><button data-a="next">Next activity →</button><button class="alt" data-a="idle">Back to waiting</button><button class="red" id="end">End session</button></div></div></div>';
+  h+='<div class="card"><h2>Activities</h2><div class="acts">'+V.activities.map(function(a,i){return '<button class="'+(a.id===curId?'cur':'alt')+'" data-open="'+esc(a.id)+'">'+(i+1)+'. '+esc(a.title)+'</button>'}).join('')+'</div><p class="muted">Tap one to open it for everyone.</p></div>';
+  h+='<div class="card"><h2>'+(cur?esc(cur.title)+' — live results':'Live results')+'</h2>'+resultsHtml(V.currentResults)+'</div>';
+  h+=compareHtml();
+  h+='<div class="card"><h2>Export</h2><div class="bar"><a class="btn" href="/api/host/s/'+V.code+'/export?type=responses">Responses CSV</a><a class="btn" href="/api/host/s/'+V.code+'/export?type=all">Everything (JSON)</a><a class="btn alt" href="/api/host/s/'+V.code+'/export?type=participants">Participants CSV</a><a class="btn alt" href="/api/host/s/'+V.code+'/export?type=summary">Summary CSV</a><a class="btn alt" href="/api/host/s/'+V.code+'/export?type=leads">Leads CSV (emails)</a></div><p class="muted">Export straight after the session. If your host has no persistent disk, data can vanish on restart.</p></div>';
+  h+='<div class="card"><h2>Edit activities</h2><p class="muted">JSON. Each choice option needs an id and name. Changing an activity after people have answered it will not rewrite their answers. Saving cannot be undone.</p><textarea id="ed" spellcheck="false"></textarea><div class="bar" style="margin-top:8px"><button id="sv">Save activities</button><button class="alt" id="rs">Reload from server</button></div><p id="edm" class="muted"></p></div>';
+  h+='<div class="card"><h2>Remove session</h2><p class="muted">Deletes this session and all its data from the server. Export first.</p><button class="red alt" id="del">Delete this session</button></div>';
+  return h;
+}
+function listHtml(){
+  var h='<div class="top"><div><h1>Human Layer organiser</h1><p class="muted">Create a session, show its QR code, run the activities.</p></div></div>';
+  h+='<div class="card"><h2>New session</h2><div class="bar"><input id="nn" placeholder="Session name" maxlength="80" value="AIA Accra"><select id="np"><option value="named">Collect display names</option><option value="aggregate">Aggregate only (no names)</option></select><input id="na" type="number" min="0" max="5000" placeholder="People in the room (about)" style="max-width:220px"><button id="mk">Create session</button></div></div>';
+  h+='<div class="card"><h2>Sessions</h2>'+(sessions.length?'<div class="scroll"><table><tr><th>Name</th><th>Code</th><th>Status</th><th>Joined</th><th>Responses</th><th>Created</th><th></th></tr>'+sessions.map(function(s){return '<tr><td>'+esc(s.name)+'</td><td>'+esc(s.code)+'</td><td>'+esc(s.status)+'</td><td>'+s.joined+'</td><td>'+s.responses+'</td><td>'+new Date(s.createdAt).toLocaleString()+'</td><td><button data-s="'+esc(s.code)+'">Open</button></td></tr>'}).join('')+'</table></div>':'<p class="muted">None yet.</p>')+'</div>';
+  return h;
+}
+function loginHtml(){
+  return '<div class="card" style="max-width:420px;margin:40px auto"><h1>Organiser sign-in</h1><form id="lf"><p><input type="password" id="pw" placeholder="Password" style="width:100%" autocomplete="current-password"></p><button type="submit">Sign in</button><p class="err" id="le"></p></form></div>';
+}
+
+function render(){
+  if(authed===null){app.innerHTML='<p class="muted">Loading…</p>';return}
+  if(authed===false){app.innerHTML=loginHtml();document.getElementById('lf').onsubmit=function(e){e.preventDefault();j('/api/host/login',{password:document.getElementById('pw').value}).then(function(r){if(r.status===200){authed=true;loadSessions()}else document.getElementById('le').textContent=r.status===0?'Cannot reach the server.':'Wrong password.'})};return}
+  var ed=document.getElementById('ed'), keep=ed&&editorDirty?ed.value:null, scrollY=window.scrollY;
+  app.innerHTML=code?sessionHtml():listHtml();
+  window.scrollTo(0,scrollY);
+  bind(keep);
+}
+function bind(keep){
+  var q=function(s){return app.querySelector(s)};
+  if(!code){
+    var mk=q('#mk'); if(mk)mk.onclick=function(){j('/api/host/sessions',{name:q('#nn').value,privacy:q('#np').value,audience:(q('#na')||{}).value}).then(function(r){if(r.status===200)open(r.body.code)})};
+    app.querySelectorAll('[data-s]').forEach(function(b){b.onclick=function(){open(b.dataset.s)}});
+    return;
+  }
+  if(!V) return;
+  q('#back').onclick=function(){code=null;V=null;if(es){es.close();es=null}loadSessions()};
+  q('#cp').onclick=function(){var u=joinUrl(code);(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(function(){q('#cp').textContent='Copied'},function(){q('#cp').textContent='Copy failed'})};
+  app.querySelectorAll('[data-a]').forEach(function(b){b.onclick=function(){act(b.dataset.a)}});
+  var aus=q('#aus'); if(aus)aus.onclick=function(){act('audience',{audience:q('#au').value})};
+  app.querySelectorAll('[data-open]').forEach(function(b){b.onclick=function(){act('open',{activityId:b.dataset.open})}});
+  app.querySelectorAll('[data-cmp]').forEach(function(s){s.onchange=function(){if(s.dataset.cmp==='A')cmpA=s.value;else cmpB=s.value;render()}});
+  var eb=q('#end'); var armed=false; eb.onclick=function(){ if(!armed){armed=true;eb.textContent='Tap again to end for everyone';setTimeout(function(){armed=false;eb.textContent='End session'},4000)} else act('end') };
+  var db=q('#del'); var da=false; db.onclick=function(){ if(!da){da=true;db.textContent='Tap again to permanently delete';setTimeout(function(){da=false;db.textContent='Delete this session'},4000)} else j('/api/host/s/'+code+'/delete',{}).then(function(){code=null;V=null;if(es){es.close();es=null}loadSessions()}) };
+  var ed=q('#ed'); ed.value=keep!=null?keep:(edText||'');
+  ed.oninput=function(){editorDirty=true};
+  if(keep==null&&edText===null){ loadEditor(); }
+  q('#sv').onclick=function(){ var parsed; try{parsed=JSON.parse(ed.value)}catch(e){q('#edm').textContent='Not valid JSON: '+e.message;return}
+    j('/api/host/s/'+code+'/activities',{activities:parsed}).then(function(r){q('#edm').textContent=r.status===200?'Saved.':'Not saved: '+(r.body.error||r.status);if(r.status===200){editorDirty=false;edText=ed.value}}) };
+  q('#rs').onclick=function(){editorDirty=false;loadEditor(true)};
+}
+function loadEditor(force){ j('/api/host/s/'+code+'/export?type=activities').then(function(r){ var ed=document.getElementById('ed'); if(r.status===200){edText=JSON.stringify(r.body,null,2); if(ed&&(force||!editorDirty)){ed.value=edText}} }) }
+
+loadSessions();
+})();
+</script>
+</body>
+</html>

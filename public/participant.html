@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>The Human Layer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+:root{--ink:#0B0B0B;--ivory:#FBF8F0;--card:#FFFFFF;--line:#D9D0B8;--muted:#5A564C;--red:#C8111F;--green:#17692B;--yellow:#F8B808}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ivory);color:var(--ink);font:17px/1.45 "DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+body{min-height:100vh;min-height:100dvh;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+main{max-width:520px;margin:0 auto}
+h1{font-size:28px;line-height:1.1;margin:0 0 10px;letter-spacing:-.01em}
+h2{font-size:22px;line-height:1.2;margin:0 0 6px}
+p{margin:0 0 12px}
+.kicker{font-size:13px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--red);margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:0 0 12px}
+.muted{color:var(--muted);font-size:15px}
+.small{font-size:14px;color:var(--muted)}
+label.f{display:block;font-weight:700;margin:12px 0 6px}
+input[type=text]{width:100%;font:inherit;font-size:17px;padding:12px;border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input[type=text]:focus{outline:3px solid var(--yellow);border-color:var(--ink)}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:14px 18px;background:var(--ink);color:var(--ivory);width:100%;min-height:52px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+button.ghost{background:transparent;color:var(--ink);border:2px solid var(--ink)}
+button.link{background:none;color:var(--muted);text-decoration:underline;font-weight:500;min-height:44px;padding:8px;width:auto}
+.opt{display:block;position:relative;border:2px solid var(--line);border-radius:12px;padding:12px 12px 12px 44px;margin:0 0 10px;background:var(--card);cursor:pointer}
+.opt input{position:absolute;left:14px;top:16px;width:20px;height:20px;accent-color:var(--ink)}
+.opt.sel{border-color:var(--ink);background:#fff;box-shadow:0 0 0 2px var(--yellow)}
+.opt b{font-size:19px}
+.opt .role{color:var(--muted);font-size:14px;margin-left:6px}
+.opt ul{list-style:none;margin:6px 0 0;padding:0;font-size:14px;line-height:1.35}
+.opt li.p::before{content:"+ ";color:var(--green);font-weight:700}
+.opt li.m::before{content:"\25CF  ";color:var(--ink);font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid var(--line);border-radius:999px;padding:10px 14px;background:var(--card);cursor:pointer;font-size:16px}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip.sel{border-color:var(--ink);background:var(--yellow);font-weight:700}
+.banner{position:sticky;top:0;background:var(--red);color:#fff;font-weight:700;padding:10px 14px;border-radius:10px;margin:0 0 12px;font-size:15px}
+.err{background:#fff;border:2px solid var(--red);color:var(--red);border-radius:10px;padding:10px 12px;margin:0 0 12px;font-weight:500}
+.big{font-size:34px;line-height:1.05;margin:20px 0 10px}
+.tick{display:inline-block;width:44px;height:44px;border-radius:50%;background:var(--green);color:#fff;text-align:center;line-height:44px;font-size:26px;font-weight:700;margin-bottom:10px}
+.sb{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:14px}.sb span{width:64px;color:var(--muted)}.sb em{flex:1;height:9px;border-radius:5px;background:#E8E1D0;overflow:hidden}.sb em i{display:block;height:100%;background:var(--ink);border-radius:5px}.sb b{font-size:14px;width:20px;text-align:right}
+.job{border-left:6px solid var(--red);padding:2px 0 2px 12px;margin:0 0 14px}
+.timer{display:inline-block;background:var(--ink);color:var(--yellow);font-weight:700;border-radius:999px;padding:6px 14px;font-variant-numeric:tabular-nums;margin:0 0 12px}
+.rec{font-family:ui-monospace,Menlo,monospace;font-weight:700;letter-spacing:.2em;font-size:20px}
+.foot{margin-top:24px;border-top:1px solid var(--line);padding-top:12px}
+.row{min-height:44px;display:flex;gap:10px;align-items:flex-start}
+.row input[type=checkbox]{width:22px;height:22px;margin-top:3px;accent-color:var(--ink);flex:none}
+</style>
+</head>
+<body>
+<div style="max-width:520px;margin:0 auto 6px"><img src="/present/logo.png" alt="Gold Coast Games" width="52" height="52" style="display:block"></div>
+<main id="app" aria-live="polite"><p class="muted">Loading…</p></main>
+<script>
+(function(){
+'use strict';
+var code=(location.pathname.split('/')[2]||'').toUpperCase();
+var KEY='hl_pid_'+code;
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
+var pid=lsGet(KEY)||'';
+var HKEY='hl_helper_'+code, helperPid=lsGet(HKEY)||'', neighbourJoin=false, viaPid='';
+var S=null, info=null, es=null, offline=false, sending=false, err='', draft={}, viewed={}, offset=0, startLocal={}, showRecover=false, showHelp=false, joinErr='', joining=false;
+var app=document.getElementById('app');
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+
+function api(path,body,tries){
+  tries=tries||1;
+  return new Promise(function(resolve){
+    (function attempt(n){
+      fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+        .then(function(r){return r.json().catch(function(){return {}}).then(function(j){resolve({status:r.status,body:j})})})
+        .catch(function(){ if(n<tries){setTimeout(function(){attempt(n+1)},800*n)} else resolve({status:0,body:{error:'network'}}) });
+    })(1);
+  });
+}
+
+function connect(){
+  if(es){es.close();es=null}
+  es=new EventSource('/api/s/'+code+'/stream?pid='+encodeURIComponent(pid));
+  es.addEventListener('state',function(e){
+    S=JSON.parse(e.data); offline=false; offset=S.now-Date.now();
+    if(!S.joined && pid){ lsDel(KEY); pid=''; joinErr='We could not find your earlier session. Rejoin, or enter your recovery code.'; es.close(); es=null; loadInfo(); return; }
+    render(); maybeView();
+  });
+  es.onerror=function(){ offline=true; render(); };
+}
+function loadInfo(){
+  fetch('/api/s/'+code+'/info').then(function(r){return r.ok?r.json():Promise.reject(r.status)}).then(function(j){info=j;render()}).catch(function(s){info={error:s===404?'notfound':'network'};render()});
+}
+
+function maybeView(){
+  if(!S||!S.activity||S.phase!=='open'||S.mine) return;
+  var id=S.activity.id; if(viewed[id]) return; viewed[id]=1;
+  api('/api/s/'+code+'/view',{pid:pid,activityId:id},3).then(function(r){ if(r.status===200){ startLocal[id]=null; if(S&&S.activity&&S.activity.id===id){S.viewedAt=r.body.at} } else {delete viewed[id]} });
+}
+
+function welcome(){
+  if(!info) return '<p class="muted">Loading…</p>';
+  if(info.error==='notfound') return '<h1>Session not found</h1><p>Check the code on the screen, or scan the QR code again.</p>';
+  if(info.error) return '<h1>Cannot reach the server</h1><p>Check your connection and reload this page.</p>';
+  if(info.status==='ended') return '<h1>This session has ended</h1><p>Thank you for taking part.</p>';
+  var named=info.privacy==='named';
+  var notice=named
+   ? 'We record your answers. Only the organiser sees your name and answers. The big screen shows totals, and your name only if you win a prize.'
+   : 'No name needed. We record your answers without your name. The room sees totals only.';
+  var h=neighbourJoin
+   ? '<p class="kicker">'+esc(info.name)+'</p><h1>YOUR NEIGHBOUR JOINS HERE</h1><p>They can answer on this phone. Their answers stay separate from yours.</p>'
+   : '<p class="kicker">'+esc(info.name)+'</p><h1>WELCOME</h1>';
+  if(joinErr) h+='<div class="err">'+esc(joinErr)+'</div>';
+  h+='<form id="jf" class="card">';
+  if(named) h+='<label class="f" for="nm">Display name</label><input type="text" id="nm" maxlength="40" autocomplete="nickname" required>';
+  h+='<p class="small" style="margin-top:12px">'+esc(notice)+'</p>'+
+   '<label class="row"><input type="checkbox" id="cs"><span>OK, I understand.</span></label>'+
+   '<div style="height:12px"></div><button type="submit" id="jb">'+(joining?'Joining…':'Join')+'</button></form>'+
+   (neighbourJoin?'<button class="link" type="button" data-nb="cancel">Cancel and go back to my answers</button>':'<button class="link" id="rc">Joined on another phone? Use your code</button>');
+  if(showRecover&&!neighbourJoin) h+='<form id="rf" class="card"><label class="f" for="rv">Recovery code</label><input type="text" id="rv" maxlength="8" autocapitalize="characters" autocomplete="off"><div style="height:12px"></div><button type="submit">Restore my session</button></form>';
+  return h;
+}
+
+function bars(n){ var L=['Speed','Accuracy','On time','Free time']; return '<div style="margin:6px 0 8px">'+L.map(function(l,i){return '<div class="sb"><span>'+l+'</span><em><i style="width:'+(n[i]*10)+'%"></i></em><b>'+n[i]+'</b></div>'}).join('')+'</div>'; }
+function optCard(o,sel){
+  var plus=(o.plus||[]).map(function(t){return '<li class="p">'+esc(t)+'</li>'}).join('');
+  var minus=(o.minus||[]).map(function(t){return '<li class="m">'+esc(t)+'</li>'}).join('');
+  var body=(plus||minus)?'<ul>'+plus+minus+'</ul>':'';
+  return '<label class="opt'+(sel?' sel':'')+'"><input type="radio" name="choice" value="'+esc(o.id)+'"'+(sel?' checked':'')+'><b>'+esc(o.name||o.label)+'</b>'+(o.role?'<span class="role">'+esc(o.role)+'</span>':'')+(o.nums?bars(o.nums):(o.stats?'<span class="role" style="display:block;margin:2px 0 6px">'+esc(o.stats)+'</span>':''))+body+'</label>';
+}
+
+var istep={}; // kept for compatibility; the interest form is now one screen
+function interestForm(a){
+  var d=draft[a.id]=draft[a.id]||{};
+  var h='<p class="kicker">'+esc(a.title)+'</p><h2>'+esc(a.prompt||'Which of your systems could benefit from game thinking?')+'</h2><form id="af">';
+  h+='<p class="small" style="margin-bottom:10px">'+esc(a.usesLabel||'Tap any that apply')+'</p>';
+  (a.uses||[]).forEach(function(u){ var s=(d.uses||[]).indexOf(u.id)>=0; h+='<label class="opt'+(s?' sel':'')+'"><input type="checkbox" name="uses" value="'+esc(u.id)+'"'+(s?' checked':'')+'><b>'+esc(u.name)+'</b>'+(u.hint?'<span class="role" style="display:block;margin:2px 0 0">'+esc(u.hint)+'</span>':'')+'</label>'; });
+  h+='<label class="f" for="em">Your email</label><input type="text" id="em" name="email" inputmode="email" autocomplete="email" autocapitalize="off" maxlength="120" value="'+esc(d.email||'')+'">';
+  h+='<label class="f" for="co">Your company <span class="small">(optional)</span></label><input type="text" id="co" name="company" autocomplete="organization" maxlength="80" value="'+esc(d.company||'')+'">';
+  h+='<label class="f" for="pr">'+esc(a.problemLabel||'Anything specific? Optional')+'</label><input type="text" id="pr" name="problem" maxlength="400" placeholder="'+esc(a.problemHint||'')+'" value="'+esc(d.problem||'')+'">';
+  if(err) h+='<div class="err" style="margin-top:12px">'+esc(err)+'</div>';
+  h+='<div style="height:14px"></div><button type="submit" id="sb"'+(sending?' disabled':'')+'>'+(sending?'Sending\u2026':'Send')+'</button>';
+  if(!sending) h+='<button type="button" class="link" id="nr">Not right now</button>';
+  h+='<p class="small" style="margin-top:10px">'+esc(a.emailNote||'')+' This is interest, not a booking.</p>';
+  return h+'</form>';
+}
+function activityForm(a){
+  if(a.kind==='interest') return interestForm(a);
+  var d=draft[a.id]=draft[a.id]||{};
+  var h='<p class="kicker">'+esc(a.title)+'</p>';
+  if(a.role) h+='<p class="small" style="font-weight:700;margin:0 0 6px">You are '+esc(a.role)+'.</p>';
+  if(a.short||a.job) h+='<div class="job">'+esc(a.short||a.job)+'</div>';
+  h+='<h2>'+esc(a.prompt||'')+'</h2>';
+  if(a.kind==='onboard'&&S.me&&S.me.arm==='timed'&&a.timedSeconds){
+    h+='<div class="timer" id="tm">'+esc(a.timedSeconds)+'s</div>';
+    if(a.timedNote) h+='<p class="small">'+esc(a.timedNote)+'</p>';
+  }
+  h+='<form id="af">';
+  if(a.kind==='onboard'){
+    (a.fields||[]).forEach(function(f){
+      h+='<label class="f">'+esc(f.label)+'</label>';
+      if(f.type==='select'){
+        h+='<div class="chips">'+(f.options||[]).map(function(op){var s=(d.answers||{})[f.id]===op;return '<label class="chip'+(s?' sel':'')+'"><input type="radio" name="f_'+esc(f.id)+'" value="'+esc(op)+'"'+(s?' checked':'')+'>'+esc(op)+'</label>'}).join('')+'</div>';
+      } else {
+        h+='<input type="text" name="f_'+esc(f.id)+'" maxlength="80" value="'+esc((d.answers||{})[f.id]||'')+'">';
+      }
+    });
+  } else {
+    h+=(a.options||[]).map(function(o){return optCard(o,d.choice===o.id)}).join('');
+    if(a.askReason){
+      h+='<label class="f">What mattered most?</label><div class="chips">'+(a.reasons||[]).map(function(r){var s=d.reason===r.id;return '<label class="chip'+(s?' sel':'')+'"><input type="radio" name="reason" value="'+esc(r.id)+'"'+(s?' checked':'')+'>'+esc(r.label)+'</label>'}).join('')+'</div>';
+    }
+    if(a.second){ h+='<label class="f">'+esc(a.second.label)+'</label><div class="chips">'+(a.second.options||[]).map(function(o){var s=d.second===o.id;return '<label class="chip'+(s?' sel':'')+'"><input type="radio" name="second" value="'+esc(o.id)+'"'+(s?' checked':'')+'>'+esc(o.name)+'</label>'}).join('')+'</div>'; }
+    if(a.note) h+='<label class="f">Anything to add? <span class="small">(optional)</span></label><input type="text" name="note" maxlength="140" value="'+esc(d.note||'')+'">';
+  }
+  if(err) h+='<div class="err" style="margin-top:12px">'+esc(err)+'</div>';
+  h+='<div style="height:14px"></div><button type="submit" id="sb"'+(sending?' disabled':'')+'>'+(sending?'Sending…':(err?'Try again':'Submit'))+'</button></form>';
+  return h;
+}
+
+function footer(){
+  if(!S||!S.me) return '';
+  var h='<div class="foot small">';
+  if(helperPid){
+    h+='<p style="font-size:16px;font-weight:700;margin:0 0 8px">You are answering for a neighbour on this phone.</p>'+
+      '<button type="button" class="ghost" data-nb="back" style="width:100%">Back to my own answers</button>';
+  } else {
+    h+='<button type="button" class="ghost" data-help="1" style="width:100%">'+(showHelp?'Hide':'Help a neighbour answer')+'</button>';
+    if(showHelp){
+      h+='<div style="margin-top:12px;text-align:center"><p style="font-size:16px;font-weight:700;margin:0 0 8px">Is someone next to you stuck, or not used to smartphones? They can answer on your phone.</p>'+
+        '<button type="button" data-nb="start" style="width:100%">Start for a neighbour</button>'+
+        (S.me.helped?'<p style="margin-top:10px;font-weight:700">You have helped '+S.me.helped+(S.me.helped===1?' person':' people')+' join.</p>':'')+'</div>';
+    } else if(S.me.helped){
+      h+='<p style="margin-top:10px;font-weight:700">You have helped '+S.me.helped+(S.me.helped===1?' person':' people')+' join.</p>';
+    }
+  }
+  h+='<p style="margin-top:14px">'+(helperPid?'Their code: ':'Your code: ')+'<span class="rec">'+esc(S.me.recovery)+'</span><br>Use it to continue on another phone.</p></div>';
+  return h;
+}
+
+function switchTo(newPid){
+  pid=newPid; lsSet(KEY,pid); viewed={}; draft={}; startLocal={}; err=''; S=null; showHelp=false;
+  if(typeof istep==='object') for(var k in istep) delete istep[k];
+  app.dataset.last=''; render(); connect(); window.scrollTo(0,0);
+}
+
+function progressBar(){
+  if(!S||!S.joined||S.progress==null||S.phase==='ended'||(S.session&&S.session.status==='ended'))return '';
+  var p=S.progress;
+  return '<div style="position:sticky;top:0;z-index:5;background:var(--ivory);padding:8px 0 10px;margin-bottom:10px"><div style="height:10px;background:#D9D4C6" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+p+'" aria-label="Talk progress"><div style="height:100%;width:'+p+'%;background:var(--ink,#0B0B0B);transition:width .6s"></div></div><p class="small" style="margin:4px 0 0">'+(p>=100?'Last step. Thank you for staying.':p+'% of the talk. Keep this page open.')+'</p></div>';
+}
+function body(){
+  var w=(S&&S.won)?'<div style="background:#0B0B0B;color:#fff;padding:16px 18px;margin-bottom:14px"><p style="font-size:26px;font-weight:800;margin:0">You won the golden apple.</p><p class="small" style="margin:6px 0 0;color:#ddd">Show this screen to Hind.</p></div>':'';
+  return progressBar()+w+body0();
+}
+function body0(){
+  if(neighbourJoin) return welcome();
+  if(!pid) return welcome();
+  if(!S) return '<p class="muted">Loading…</p>';
+  if(!S.joined) return welcome();
+  var a=S.activity, ph=S.phase, mine=S.mine;
+  if(ph==='ended'||S.session.status==='ended'){
+    return '<p class="kicker">'+esc(S.session.name)+'</p><h1>Thank you.</h1><p>The session is complete. Your responses stay with this session for the organiser’s analysis.</p>'+(S.session.privacy==='named'?'<p class="small">They are linked to the display name you gave.</p>':'<p class="small">They are stored under a random ID, not your name.</p>')+footer();
+  }
+  if(!a||ph==='idle'){
+    return '<p class="kicker">'+esc(S.session.name)+'</p><div class="tick">✓</div><h1>You’re in.</h1><p>Keep this page open.</p>'+footer();
+  }
+  var head='<p class="kicker">'+esc(a.title)+'</p>';
+  if(ph==='revealed') return head+'<h1>'+(mine?'Your vote is in.':'Results are up.')+'</h1><p>See how the room decided on the big screen.</p>'+(mine?'':'<p class="small">You did not submit for this one.</p>')+footer();
+  if(mine&&a.kind==='interest'){
+    return head+'<div class="tick">\u2713</div><h1>'+(mine.choice==='notnow'?'Thanks for taking part.':'Thanks for your interest.')+'</h1><p>'+(mine.choice==='notnow'?'No problem. Nothing further is needed.':'We\u2019ll follow up using the email you provided, if you gave one. This is an expression of interest, not a booking.')+'</p>'+footer();
+  }
+  if(mine) {
+    if(ph==='paused') return head+'<div class="tick">✓</div><h1>Your choice has been recorded.</h1><p>The presenter has paused. Stay on this page.</p>'+footer();
+    return head+'<div class="tick">✓</div><h1>Your choice has been recorded.</h1><p>'+(ph==='open'?'Waiting for the room. Stay on this page.':'Submissions are closed. Results come next.')+'</p>'+footer();
+  }
+  if(ph==='paused') return head+'<h1>Paused</h1><p>The presenter has paused this activity. It will reopen here.</p>'+footer();
+  if(ph==='closed') return head+'<h1>Submissions are closed.</h1><p>You did not submit for this one. The next activity will appear here.</p>'+footer();
+  return activityForm(a)+footer();
+}
+
+function render(){
+  var keepFocus=document.activeElement&&document.activeElement.name;
+  var h=(offline?'<div class="banner" role="status">Connection lost. Reconnecting… Anything you submit will not be recorded until this goes away.</div>':'')+body();
+  if(app.dataset.last===h) return; app.dataset.last=h; app.innerHTML=h; bind();
+  if(keepFocus){var el=app.querySelector('[name="'+keepFocus+'"]'); if(el&&el.type==='text') el.focus();}
+}
+
+function sendInterest(a,d){
+  sending=true; err=''; app.dataset.last=''; render();
+  api('/api/s/'+code+'/respond',{pid:pid,activityId:a.id,choice:d.choice,email:d.choice==='notnow'?'':d.email,company:d.choice==='notnow'?'':(d.company||''),problem:d.choice==='notnow'?'':(d.problem||''),uses:d.choice==='notnow'?[]:(d.uses||[])},3).then(function(r){
+    sending=false;
+    if(r.status===200&&r.body.ok){ if(S&&S.activity&&S.activity.id===a.id){S.mine={choice:d.choice,at:r.body.at,interest:true}} err=''; }
+    else if(r.status===409){ err='Submissions are closed. Nothing was recorded.'; }
+    else if(r.status===0){ err='We could not reach the server, so nothing is recorded yet. Check your connection and try again.'; }
+    else if(r.body&&r.body.error==='bad_email'){ err='That email does not look right.'; istep[a.id]=2; }
+    else { err='Nothing was recorded ('+esc((r.body&&r.body.error)||r.status)+'). Please try again.'; }
+    app.dataset.last=''; render();
+  });
+}
+function readForm(a){
+  var form=document.getElementById('af'); var d=draft[a.id]=draft[a.id]||{};
+  var fd=new FormData(form);
+  if(a.kind==='interest'){ var em=fd.get('email'); if(em!==null)d.email=String(em).trim(); var pr=fd.get('problem'); if(pr!==null)d.problem=String(pr).trim(); var co=fd.get('company'); if(co!==null)d.company=String(co).trim(); if(form.querySelector('[name="uses"]'))d.uses=fd.getAll('uses'); return d; }
+  if(a.kind==='onboard'){ d.answers={}; (a.fields||[]).forEach(function(f){d.answers[f.id]=String(fd.get('f_'+f.id)||'').trim()}); }
+  else { d.choice=fd.get('choice')||''; d.reason=fd.get('reason')||''; d.second=fd.get('second')||''; d.note=String(fd.get('note')||'').trim(); }
+  return d;
+}
+
+function bind(){
+  var jf=document.getElementById('jf');
+  if(jf){
+    jf.onsubmit=function(e){
+      e.preventDefault(); if(joining) return;
+      var nmEl=document.getElementById('nm'); var nm=nmEl?nmEl.value.trim():'';
+      if(info.privacy==='named'&&!nm){joinErr='Please enter a display name.';render();return}
+      if(!document.getElementById('cs').checked){joinErr='Please tick the box to continue.';render();return}
+      joining=true; joinErr=''; render();
+      api('/api/s/'+code+'/join',{via:(neighbourJoin?viaPid:(new URLSearchParams(location.search).get('h')||'')),consent:true,name:nm},3).then(function(r){
+        joining=false;
+        if(r.status===200){ if(neighbourJoin){helperPid=viaPid;lsSet(HKEY,helperPid);neighbourJoin=false;viaPid='';switchTo(r.body.pid)} else {pid=r.body.pid;lsSet(KEY,pid);connect()} }
+        else {joinErr=r.status===0?'Could not reach the server. Not joined yet. Please try again.':(r.body.error==='ended'?'This session has ended.':'Could not join. Please try again.');render()}
+      });
+    };
+    var rc=document.getElementById('rc'); if(rc) rc.onclick=function(){showRecover=!showRecover;render()};
+    var rf=document.getElementById('rf');
+    if(rf) rf.onsubmit=function(e){e.preventDefault(); var v=document.getElementById('rv').value.trim();
+      api('/api/s/'+code+'/recover',{recovery:v},2).then(function(r){ if(r.status===200){pid=r.body.pid;lsSet(KEY,pid);joinErr='';connect()} else {joinErr=r.body.error==='code_not_found'?'That recovery code was not found.':'Could not reach the server. Try again.';render()} });
+    };
+    return;
+  }
+  var af=document.getElementById('af');
+  if(af&&S&&S.activity&&S.activity.kind==='interest'){
+    var ia=S.activity, nr=document.getElementById('nr');
+    if(nr) nr.onclick=function(){ var dd=readForm(ia); dd.choice='notnow'; dd.email=''; dd.problem=''; dd.uses=[]; sendInterest(ia,dd); };
+  }
+  if(af&&S&&S.activity){
+    var a=S.activity;
+    af.addEventListener('change',function(e){readForm(a);if(e.target.type==='radio'||e.target.type==='checkbox'){af.querySelectorAll('label.opt,label.chip').forEach(function(l){var i=l.querySelector('input');l.classList.toggle('sel',!!(i&&i.checked))})}});
+    af.addEventListener('input',function(e){ if(e.target.type==='text') readForm(a); });
+    af.onsubmit=function(e){
+      e.preventDefault(); if(sending) return;
+      var d=readForm(a);
+      if(a.kind==='interest'){
+        err=''; d.choice='consult';
+        if(!d.email){err='Please add your email so we can reply. Or tap Not right now.';app.dataset.last='';render();return}
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)){err='That email does not look right.';app.dataset.last='';render();return}
+        sendInterest(a,d); return;
+      }
+      if(a.kind==='onboard'){ if((a.fields||[]).some(function(f){return !d.answers[f.id]})){err='Please answer every question.';app.dataset.last='';render();return} }
+      else { if(!d.choice){err='Please choose one.';app.dataset.last='';render();return}
+             if(a.askReason&&!d.reason){err='Please say what mattered most.';app.dataset.last='';render();return}
+             if(a.second&&!d.second){err='Please answer both questions.';app.dataset.last='';render();return} }
+      sending=true; err=''; app.dataset.last=''; render();
+      var payload={pid:pid,activityId:a.id,choice:d.choice,reason:d.reason,second:d.second,note:d.note,answers:d.answers};
+      api('/api/s/'+code+'/respond',payload,3).then(function(r){
+        sending=false;
+        if(r.status===200&&r.body.ok){ if(S&&S.activity&&S.activity.id===a.id){S.mine={choice:d.choice,reason:d.reason,note:d.note,at:r.body.at}} err=''; }
+        else if(r.status===409){ err=r.body.error==='paused'?'The presenter paused this activity. Nothing was recorded. Try again when it reopens.':'Submissions closed before your answer arrived. Nothing was recorded.'; }
+        else if(r.status===0){ err='We could not reach the server, so your answer is not recorded yet. Check your connection and try again.'; }
+        else { err='Your answer was not recorded ('+esc(r.body.error||r.status)+'). Please check it and try again.'; }
+        app.dataset.last=''; render();
+      });
+    };
+  }
+}
+
+setInterval(function(){
+  var tm=document.getElementById('tm'); if(!tm||!S||!S.activity) return;
+  var a=S.activity, id=a.id; if(!startLocal[id]) startLocal[id]=S.viewedAt||(Date.now()+offset);
+  var left=Math.max(0,a.timedSeconds-((Date.now()+offset)-(S.viewedAt||startLocal[id]))/1000);
+  tm.textContent=Math.ceil(left)+'s';
+},250);
+
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('[data-help],[data-nb]'); if(!b)return;
+  if(b.hasAttribute('data-help')){showHelp=!showHelp;render();return}
+  var act=b.getAttribute('data-nb');
+  if(act==='start'){ neighbourJoin=true; viaPid=pid; joinErr=''; app.dataset.last=''; render(); window.scrollTo(0,0); return }
+  if(act==='cancel'){ neighbourJoin=false; viaPid=''; joinErr=''; app.dataset.last=''; render(); return }
+  if(act==='back'){ var hp=helperPid; helperPid=''; lsDel(HKEY); if(hp) switchTo(hp); return }
+});
+window.addEventListener('online',function(){ if(pid&&!es) connect(); });
+if(!code){ app.innerHTML='<h1>Missing session code</h1>'; }
+else if(pid){ connect(); loadInfo(); }
+else { loadInfo(); }
+})();
+</script>
+</body>
+</html>
